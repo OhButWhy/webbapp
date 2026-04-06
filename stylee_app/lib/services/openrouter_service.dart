@@ -1,21 +1,24 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class OpenRouterService {
-  static const String _apiKey = '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';
+  // Получаем ключ из .env
+  static String get _apiKey => dotenv.env['OPENROUTER_API_KEY'] ?? '';
 
   Future<String> getStyleAdvice(String userMessage) async {
 
     const String model = 'perplexity/sonar';
 
     print('🔍 DEBUG: Отправляю запрос...');
-    print('🔑 DEBUG: Ключ начинается с ${_apiKey.substring(0, 12)}...');
+    print('🔑 DEBUG: Ключ начинается с [1m[31m[0m[1m[31m[0m[1m[31m[0m[1m[31m[0m[1m[31m[0m[1m[31m[0m[1m[31m[0m[1m[31m[0m[1m[31m');
+    print('🔑 DEBUG: Ключ начинается с [1m_apiKey[0m');
 
     final response = await http.post(
       Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_apiKey',
+        'Authorization': 'Bearer [1m_apiKey[0m',
         'HTTP-Referer': 'https://stylee-app.com',
         'X-Title': 'Stylee App',
       },
