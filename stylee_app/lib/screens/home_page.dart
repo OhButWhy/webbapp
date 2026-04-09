@@ -6,6 +6,7 @@ import 'package:stylee_app/components/text_filed.dart';
 import 'package:stylee_app/components/wall_post.dart';
 import 'package:stylee_app/screens/profile_page.dart';
 import 'package:stylee_app/screens/chat_page.dart';
+import 'package:stylee_app/screens/outfit_picker_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -78,32 +79,38 @@ class _HomePageState extends State<HomePage> {
         currentPage = _buildWallFeed();
     }
 
-    return Scaffold(
-      backgroundColor: Colors.pink.shade100,
-      appBar: AppBar(
-        title: Text(_selectedIndex == 0 ? "The Wall" : "Stylee"),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-      ),
-      drawer: _selectedIndex == 0 ? MyDrawer(onProfileTap: goToProfilePage, onSignOut: signOut) : null,
-      body: currentPage,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onBottomNavTap,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.black,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.grey,
-        iconSize: 24,
-        selectedFontSize: 10,
-        unselectedFontSize: 10,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.rss_feed), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite_border), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.add_circle_rounded), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline_rounded), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: ''),
-        ],
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      routes: {
+        '/outfit_picker': (context) => const OutfitPickerScreen(),
+      },
+      home: Scaffold(
+        backgroundColor: Colors.pink.shade100,
+        appBar: AppBar(
+          title: Text(_selectedIndex == 0 ? "The Wall" : "Stylee"),
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+        ),
+        drawer: _selectedIndex == 0 ? MyDrawer(onProfileTap: goToProfilePage, onSignOut: signOut) : null,
+        body: currentPage,
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onBottomNavTap,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.black,
+          selectedItemColor: Colors.white,
+          unselectedItemColor: Colors.grey,
+          iconSize: 24,
+          selectedFontSize: 10,
+          unselectedFontSize: 10,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.rss_feed), label: ''),
+            BottomNavigationBarItem(icon: Icon(Icons.favorite_border), label: ''),
+            BottomNavigationBarItem(icon: Icon(Icons.add_circle_rounded), label: ''),
+            BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline_rounded), label: ''),
+            BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: ''),
+          ],
+        ),
       ),
     );
   }
