@@ -7,6 +7,7 @@ import 'package:stylee_app/components/wall_post.dart';
 import 'package:stylee_app/screens/profile_page.dart';
 import 'package:stylee_app/screens/chat_page.dart';
 import 'package:stylee_app/screens/outfit_picker_screen.dart';
+import 'package:stylee_app/screens/favorite_images_screen.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -64,7 +65,7 @@ class _HomePageState extends State<HomePage> {
         currentPage = _buildWallFeed(); // Лента
         break;
       case 1:
-        currentPage = const Center(child: Text('Избранное'));
+        currentPage = const FavoriteImagesScreen();
         break;
       case 2:
         currentPage = _buildWallFeed();
@@ -130,12 +131,15 @@ class _HomePageState extends State<HomePage> {
                   itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
                     final post = snapshot.data!.docs[index];
+                    final postData = post.data() as Map<String, dynamic>;
+                    final imageUrl = (postData['imageUrl'] ?? postData['ImageUrl'])?.toString() ?? '';
                     return WallPost(
                       message: post['Message'],
                       user: post['UserEmail'],
                       postId: post.id,
                       likes: List<String>.from(post['Likes'] ?? []),
                       time: post['TimeStamp'].toString(),
+                      imageUrl: imageUrl,
                     );
                   },
                 );

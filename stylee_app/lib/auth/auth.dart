@@ -53,8 +53,13 @@ class _UserGateState extends State<UserGate> {
       });
       return;
     }
-    final doc = await FirebaseFirestore.instance.collection('Users').doc(user.email).get();
+    final docRef = FirebaseFirestore.instance.collection('Users').doc(user.email);
+    final doc = await docRef.get();
     final data = doc.data();
+    // Инициализируем единое избранное для нового проекта.
+    if (data == null || data['favoriteImages'] == null) {
+      await docRef.set({'favoriteImages': <String>[]}, SetOptions(merge: true));
+    }
     setState(() {
       _loading = false;
       _hasTestResult = data != null && data['testResult'] != null;

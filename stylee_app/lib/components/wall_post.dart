@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:stylee_app/components/favorite_post_button.dart';
 import 'package:stylee_app/components/like_button.dart';
 
 class WallPost extends StatefulWidget {
@@ -9,6 +10,7 @@ class WallPost extends StatefulWidget {
   final String postId;
   final List<String> likes;
   final String time;
+  final String imageUrl;
 
   const WallPost({
     super.key,
@@ -16,7 +18,8 @@ class WallPost extends StatefulWidget {
     required this.user,
     required this.postId,
     required this.likes,
-    required this.time
+    required this.time,
+    this.imageUrl = '',
   });
 
   @override
@@ -85,20 +88,32 @@ class _WallPostState extends State<WallPost>{
 
           const SizedBox(width: 20,),
 
-          // message and user email
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.user,
-                style: TextStyle(
-                  color: Colors.pink,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.user,
+                  style: TextStyle(
+                    color: Colors.pink,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10), 
-              Text(widget.message),
-
-            ]
+                const SizedBox(height: 10),
+                Text(widget.message),
+                if (widget.imageUrl.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      widget.imageUrl,
+                      height: 140,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ]
+              ],
+            ),
           ),
           const SizedBox(width: 20,),
 
@@ -109,11 +124,12 @@ class _WallPostState extends State<WallPost>{
                 isLiked: isLiked, 
                 onTap: toggleLike,
               ),
-              
               const SizedBox(height: 5),
-
               // like count
               Text(widget.likes.length.toString()),
+              const SizedBox(height: 10),
+              // favorite button
+              FavoritePostButton(imageUrl: widget.imageUrl),
             ],
           )
         ],

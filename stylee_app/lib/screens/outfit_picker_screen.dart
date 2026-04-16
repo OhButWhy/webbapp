@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/outfit.dart';
 import '../models/outfit_list.dart';
 
@@ -10,6 +12,51 @@ class OutfitPickerScreen extends StatefulWidget {
 }
 
 class _OutfitPickerScreenState extends State<OutfitPickerScreen> {
+  List<String> favoriteImages = [];
+  bool loadingFavorites = true;
+    @override
+    void initState() {
+      super.initState();
+      _loadFavorites();
+    }
+
+    Future<void> _loadFavorites() async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          loadingFavorites = false;
+        });
+        return;
+      }
+      final doc = await FirebaseFirestore.instance.collection('Users').doc(user.email).get();
+      final data = doc.data();
+      setState(() {
+        favoriteImages = List<String>.from(data?['favoriteImages'] ?? []);
+        loadingFavorites = false;
+      });
+    }
+
+    Future<void> _toggleFavorite(String imageUrl) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final docRef = FirebaseFirestore.instance.collection('Users').doc(user.email);
+      final isFavorite = favoriteImages.contains(imageUrl);
+      setState(() {
+        if (isFavorite) {
+          favoriteImages.remove(imageUrl);
+        } else {
+          favoriteImages.add(imageUrl);
+        }
+      });
+      await docRef.set(
+        {
+          'favoriteImages': isFavorite
+              ? FieldValue.arrayRemove([imageUrl])
+              : FieldValue.arrayUnion([imageUrl])
+        },
+        SetOptions(merge: true),
+      );
+    }
   String? selectedEvent;
   String? selectedWeather;
   String? selectedColor;
@@ -89,28 +136,36 @@ class _OutfitPickerScreenState extends State<OutfitPickerScreen> {
             ),
             const SizedBox(height: 24),
             if (showResults)
-              Expanded(
-                child: filteredOutfits.isEmpty
-                  ? const Center(child: Text('Нет подходящих образов'))
-                  : ListView.builder(
-                      itemCount: filteredOutfits.length,
-                      itemBuilder: (context, idx) {
-                        final outfit = filteredOutfits[idx];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          child: ListTile(
-                            leading: SizedBox(
-                              width: 56,
-                              height: 56,
-                              child: Image.network(outfit.imageUrl, fit: BoxFit.cover),
+              loadingFavorites
+                  ? const Center(child: CircularProgressIndicator())
+                  : Expanded(
+                      child: filteredOutfits.isEmpty
+                          ? const Center(child: Text('Нет подходящих образов'))
+                          : ListView.builder(
+                              itemCount: filteredOutfits.length,
+                              itemBuilder: (context, idx) {
+                                final outfit = filteredOutfits[idx];
+                                final isFavorite = favoriteImages.contains(outfit.imageUrl);
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 8),
+                                  child: ListTile(
+                                    leading: SizedBox(
+                                      width: 56,
+                                      height: 56,
+                                      child: Image.network(outfit.imageUrl, fit: BoxFit.cover),
+                                    ),
+                                    title: Text(outfit.title),
+                                    subtitle: Text('Стили: ${outfit.styles.join(", ")}'),
+                                    trailing: IconButton(
+                                      icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border, color: isFavorite ? Colors.red : null),
+                                      tooltip: isFavorite ? 'Убрать из избранного' : 'В избранное',
+                                      onPressed: () => _toggleFavorite(outfit.imageUrl),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                            title: Text(outfit.title),
-                            subtitle: Text('Стили: ${outfit.styles.join(", ")}'),
-                          ),
-                        );
-                      },
                     ),
-              ),
           ],
         ),
       ),
