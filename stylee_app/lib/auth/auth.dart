@@ -60,6 +60,10 @@ class _UserGateState extends State<UserGate> {
     if (data == null || data['favoriteImages'] == null) {
       await docRef.set({'favoriteImages': <String>[]}, SetOptions(merge: true));
     }
+    // Инициализируем дизлайки для новых пользователей
+    if (data == null || data['dislikes'] == null) {
+      await docRef.set({'dislikes': <Map<String, dynamic>>[]}, SetOptions(merge: true));
+    }
     setState(() {
       _loading = false;
       _hasTestResult = data != null && data['testResult'] != null;
