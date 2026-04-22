@@ -2,12 +2,27 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:stylee_app/models/dislike.dart';
 
 class OpenRouterService {
   final String _apiKey = dotenv.env['OPENROUTER_API_KEY'] ?? '';
+  
+  /// Вспомогательный сервис для работы с дизлайками (ленивая инициализация)
+  late DislikeService _dislikeService;
+
+  OpenRouterService() {
+    _dislikeService = DislikeService();
+  }
 
   /// Текстовый запрос к ИИ-стилисту
-  Future<String> getStyleAdvice(String userMessage) async {
+  /// 
+  /// Parameters:
+  ///   - userMessage: сообщение пользователя
+  ///   - dislikes: список дизлайков пользователя (опционально)
+  Future<String> getStyleAdvice(
+    String userMessage, {
+    List<Dislike> dislikes = const [],
+  }) async {
     if (_apiKey.isEmpty) {
       return '❌ Ошибка: API ключ не настроен. Добавьте OPENROUTER_API_KEY в файл .env';
     }
@@ -29,7 +44,7 @@ class OpenRouterService {
         'messages': [
           {
             'role': 'system',
-            'content': _systemPrompt
+            'content': _buildSystemPrompt(dislikes)
           },
           {'role': 'user', 'content': userMessage},
         ],
@@ -49,9 +64,15 @@ class OpenRouterService {
   }
 
   /// Запрос к ИИ-стилисту с изображением
+  /// 
+  /// Parameters:
+  ///   - userMessage: сообщение пользователя
+  ///   - imagePath: путь к файлу изображения
+  ///   - dislikes: список дизлайков пользователя (опционально)
   Future<String> getStyleAdviceWithImage({
     required String userMessage,
     required String imagePath,
+    List<Dislike> dislikes = const [],
   }) async {
     if (_apiKey.isEmpty) {
       return '❌ Ошибка: API ключ не настроен. Добавьте OPENROUTER_API_KEY в файл .env';
@@ -91,7 +112,7 @@ class OpenRouterService {
         'messages': [
           {
             'role': 'system',
-            'content': _systemPrompt
+            'content': _buildSystemPrompt(dislikes)
           },
           {
             'role': 'user',
@@ -126,7 +147,14 @@ class OpenRouterService {
     }
   }
 
-  static const String _systemPrompt = '''Ты ИИ-стилист для приложения Stylee. Отвечай ТОЛЬКО на русском языке.
+  /// Построить системный промпт с учетом дизлайков пользователя
+  /// 
+  /// Parameters:
+  ///   - dislikes: список дизлайков для исключения из рекомендаций
+  /// 
+  /// Returns: String (полный системный промпт)
+  String _buildSystemPrompt(List<Dislike> dislikes) {
+    final basePrompt = '''Ты ИИ-стилист для приложения Stylee. Отвечай ТОЛЬКО на русском языке.
 
 Твоя задача — анализировать одежду на фото и помогать подбирать образы.
 
@@ -136,7 +164,13 @@ class OpenRouterService {
 3. Учитывай occasion (мероприятие), сезон, погоду
 4. Предлагай дополнительные элементы гардероба
 5. Будь дружелюбной и стильной 😊
-6. Используй эмодзи для наглядности
+6. Используй эмодзи для наглядности''';
+
+    // Добавляем раздел с исключениями, если есть дизлайки
+    final excludeSection = _dislikeService.buildExcludeSection(dislikes);
+
+    return basePrompt + excludeSection;
+  }
 
 Пример ответа на фото:
 "Вижу синее платье миди с V-образным вырезом 👗
