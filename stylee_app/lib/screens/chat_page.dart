@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:stylee_app/models/dislike.dart';
+import 'package:stylee_app/services/dislike_service.dart';
 import 'package:stylee_app/services/openrouter_service.dart';
 
 class ChatPage extends StatefulWidget {
@@ -18,17 +20,37 @@ class _ChatPageState extends State<ChatPage> {
   final currentUser = FirebaseAuth.instance.currentUser!;
   final TextEditingController _controller = TextEditingController();
   final ImagePicker _picker = ImagePicker();
+  final _dislikeService = DislikeService();
   bool _isLoading = false;
   bool _showSidebar = false;
   String? _selectedImagePath;
   
   String? _currentChatId;
   List<Map<String, dynamic>> _messages = [];
+  List<Dislike> _userDislikes = [];
 
   @override
   void initState() {
     super.initState();
     _loadLastChat();
+    _loadUserDislikes();
+  }
+
+  /// Загрузить дизлайки пользователя из Firestore
+  Future<void> _loadUserDislikes() async {
+    try {
+      final dislikes = await _dislikeService.getDislikes(currentUser.email!);
+      setState(() {
+        _userDislikes = dislikes;
+      });
+      if (mounted) {
+        print('Загружены дизлайки: ${dislikes.length}');
+      }
+    } catch (e) {
+      if (mounted) {
+        print('Ошибка загрузки дизлайков: $e');
+      }
+    }
   }
 
   Future<void> _loadLastChat() async {
@@ -241,10 +263,14 @@ class _ChatPageState extends State<ChatPage> {
         aiText = await openRouterService.getStyleAdviceWithImage(
           userMessage: userText,
           imagePath: savedImagePath,
+          dislikes: _userDislikes,
         );
       } else {
         // Только текст
-        aiText = await openRouterService.getStyleAdvice(userText);
+        aiText = await openRouterService.getStyleAdvice(
+          userText,
+          dislikes: _userDislikes,
+        );
       }
 
       await FirebaseFirestore.instance
@@ -808,8 +834,12 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
   }
-
   Widget _buildSmallButton(IconData icon, String label) {
+                _buildSmallButton(
+                  Icons.close,
+                  'Dislike',
+                  onTap: () => _onDislike(message),
+                ),
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -843,8 +873,12 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
   }
-
-  Widget _buildInputField() {
+    Widget _buildSmallButton(
+    onPressed: onTap,
+      IconData icon,
+      String label, {
+      VoidCallback? onTap,
+    }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -980,3 +1014,41 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 }
+
+  /// Обработчик для кнопки Dislike
+  /// Сохраняет дизлайк в Firestore и обновляет кэш
+  Future<void> _onDislike(Map<String, dynamic> message) async {
+    try {
+      final description = message['description'] ?? 'Неизвестный товар';
+      
+      // Сохранить дизлайк
+      await _dislikeService.saveDisilike(
+        userEmail: currentUser.email!,
+        description: description,
+        category: 'recommendation',
+      );
+      
+      // Обновить кэш дизлайков
+      await _loadUserDislikes();
+      
+      // Показать feedback пользователю
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Запомнили! Будем избегать похожих рекомендаций'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
