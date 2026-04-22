@@ -40,6 +40,15 @@ class MyDrawer extends StatelessWidget {
                 text: 'PROFILE',
                 onTap: onProfileTap,
               ),
+              // outfit picker
+              MyListTitle(
+                icon: Icons.checkroom,
+                text: 'ПОДОБРАТЬ ОБРАЗ',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/outfit_picker');
+                },
+              ),
             ]
           ),
           // logout list 

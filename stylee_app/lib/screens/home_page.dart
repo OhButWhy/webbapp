@@ -8,8 +8,8 @@ import 'package:stylee_app/components/wall_post.dart';
 import 'package:stylee_app/screens/chat_page.dart';
 import 'package:stylee_app/screens/editor_page.dart';
 import 'package:stylee_app/screens/edit_profile_page.dart';
+import 'package:stylee_app/screens/favorite_images_screen.dart';
 import 'package:stylee_app/screens/profile_page.dart';
-import 'package:stylee_app/screens/wardrobe_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -95,7 +95,7 @@ class _HomePageState extends State<HomePage> {
         currentPage = _buildWallFeed();
         break;
       case 1:
-        currentPage = const WardrobePage();
+        currentPage = const FavoriteImagesScreen();
         break;
       case 2:
         currentPage = const EditorPage();
@@ -187,7 +187,7 @@ class _HomePageState extends State<HomePage> {
             unselectedLabelStyle: const TextStyle(fontSize: 11),
             items: [
               _buildNavItem(Icons.local_fire_department_outlined, 'Feed', 0),
-              _buildNavItem(Icons.checkroom_outlined, 'Wardrobe', 1),
+              _buildNavItem(Icons.favorite_border, 'Favorites', 1),
               _buildNavItem(Icons.auto_fix_high_outlined, 'Editor', 2),
               _buildNavItem(Icons.auto_awesome_outlined, 'AI Stylist', 3),
               _buildNavItem(Icons.person_outline, 'Profile', 4),
