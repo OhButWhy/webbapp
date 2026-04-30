@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:stylee_app/services/backend_api_service.dart';
 import 'package:stylee_app/models/dislike.dart';
 
 /// Сервис для управления дизлайками пользователя
@@ -8,7 +8,7 @@ import 'package:stylee_app/models/dislike.dart';
 /// - Загрузка дизлайков пользователя
 /// - Построение фильтра для системного промпта ИИ
 class DislikeService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final BackendApiService _backend = BackendApiService.instance;
 
   /// Сохранить новый дизлайк для пользователя
   /// 
@@ -31,12 +31,11 @@ class DislikeService {
         createdAt: DateTime.now(),
       );
 
-      await _firestore
-          .collection('Users')
-          .doc(userEmail)
-          .update({
-        'dislikes': FieldValue.arrayUnion([dislike.toMap()])
-      });
+      await _backend.addDislike(
+        email: userEmail,
+        description: dislike.description,
+        category: dislike.category,
+      );
 
       print('Дизлайк сохранён: $description');
     } catch (e) {
@@ -53,21 +52,8 @@ class DislikeService {
   /// Returns: List<Dislike> (пустой список, если нет дизлайков)
   Future<List<Dislike>> getDislikes(String userEmail) async {
     try {
-      final doc = await _firestore
-          .collection('Users')
-          .doc(userEmail)
-          .get();
-
-      if (!doc.exists) {
-        return [];
-      }
-
-      final data = doc.data();
-      final dislikesList = data?['dislikes'] as List<dynamic>? ?? [];
-
-      return dislikesList
-          .map((d) => Dislike.fromMap(d as Map<String, dynamic>))
-          .toList();
+      final dislikesList = await _backend.getDislikes(userEmail);
+      return dislikesList.map((d) => Dislike.fromMap(d)).toList();
     } catch (e) {
       print('Ошибка загрузки дизлайков: $e');
       return [];
@@ -117,12 +103,7 @@ $excludeList
         orElse: () => throw Exception('Дизлайк не найден'),
       );
 
-      await _firestore
-          .collection('Users')
-          .doc(userEmail)
-          .update({
-        'dislikes': FieldValue.arrayRemove([dislikeToRemove.toMap()])
-      });
+      await _backend.removeDislike(userEmail, dislikeToRemove.id);
 
       print('Дизлайк удалён: $dislikeId');
     } catch (e) {
@@ -134,12 +115,7 @@ $excludeList
   /// Очистить все дизлайки (опционально, для сброса профиля)
   Future<void> clearAllDislikes(String userEmail) async {
     try {
-      await _firestore
-          .collection('Users')
-          .doc(userEmail)
-          .update({
-        'dislikes': []
-      });
+      await _backend.clearDislikes(userEmail);
 
       print('Все дизлайки очищены');
     } catch (e) {

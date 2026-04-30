@@ -2,9 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:stylee_app/auth/login_or_register.dart';
 import 'package:stylee_app/screens/home_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:stylee_app/screens/onboarding_test_screen.dart';
 import 'package:stylee_app/models/test_result.dart';
+import 'package:stylee_app/services/backend_api_service.dart';
 
 class AuthPage extends StatelessWidget {
   const AuthPage({super.key});
@@ -35,6 +35,7 @@ class UserGate extends StatefulWidget {
 }
 
 class _UserGateState extends State<UserGate> {
+  final _backend = BackendApiService.instance;
   bool _loading = true;
   bool _hasTestResult = false;
 
@@ -53,20 +54,11 @@ class _UserGateState extends State<UserGate> {
       });
       return;
     }
-    final docRef = FirebaseFirestore.instance.collection('Users').doc(user.email);
-    final doc = await docRef.get();
-    final data = doc.data();
-    // Инициализируем единое избранное для нового проекта.
-    if (data == null || data['favoriteImages'] == null) {
-      await docRef.set({'favoriteImages': <String>[]}, SetOptions(merge: true));
-    }
-    // Инициализируем дизлайки для новых пользователей
-    if (data == null || data['dislikes'] == null) {
-      await docRef.set({'dislikes': <Map<String, dynamic>>[]}, SetOptions(merge: true));
-    }
+    await _backend.bootstrapUser(user.email!);
+    final profile = await _backend.getProfile(user.email!);
     setState(() {
       _loading = false;
-      _hasTestResult = data != null && data['testResult'] != null;
+      _hasTestResult = profile['testResult'] != null;
     });
   }
 
@@ -75,9 +67,7 @@ class _UserGateState extends State<UserGate> {
   void _onTestComplete(TestResult result) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    await FirebaseFirestore.instance.collection('Users').doc(user.email).set({
-      'testResult': result.toMap(),
-    }, SetOptions(merge: true));
+    await _backend.saveTestResult(user.email!, result.toMap());
     // После сохранения результата теста — возвращаем пользователя в основной flow
     if (mounted) {
       Navigator.of(context).pushReplacement(
