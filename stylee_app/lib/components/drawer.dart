@@ -42,11 +42,11 @@ class MyDrawer extends StatelessWidget {
               ),
               // outfit picker
               MyListTitle(
-                icon: Icons.checkroom,
-                text: 'ПОДОБРАТЬ ОБРАЗ',
+                icon: Icons.auto_fix_high,
+                text: 'ТЕСТ',
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.pushNamed(context, '/outfit_picker');
+                  Navigator.pushNamed(context, '/quiz');
                 },
               ),
             ]

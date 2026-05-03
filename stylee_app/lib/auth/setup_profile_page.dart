@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
+import 'package:stylee_app/models/test_result.dart';
 import 'package:stylee_app/screens/home_page.dart';
 
 class SetupProfilePage extends StatefulWidget {
@@ -127,6 +129,24 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
         password: widget.password,
       );
 
+      // Начать прохождение теста
+      final testResult = await Navigator.push<TestResult?>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QuizWizard(
+            existingResult: null,
+            onComplete: (result) {
+              // Просто продолжаем, результат сохранится позже
+            },
+          ),
+        ),
+      );
+
+      // Сохранить результат теста если есть
+      if (testResult != null) {
+        await _saveTestResult(testResult);
+      }
+
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const HomePage()),
@@ -140,6 +160,17 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
           SnackBar(content: Text('Ошибка: ${e.toString()}')),
         );
       }
+    }
+  }
+
+  Future<void> _saveTestResult(TestResult result) async {
+    try {
+      await FirebaseFirestore.instance.collection('Users').doc(widget.email).update({
+        'testResult': result.toMap(),
+        'hasCompletedTest': true,
+      }).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      print('Error saving test result: $e');
     }
   }
 
@@ -163,6 +194,24 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
         email: widget.email,
         password: widget.password,
       );
+
+      // Начать прохождение теста
+      final testResult = await Navigator.push<TestResult?>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QuizWizard(
+            existingResult: null,
+            onComplete: (result) {
+              // Просто продолжаем, результат сохранится позже
+            },
+          ),
+        ),
+      );
+
+      // Сохранить результат теста если есть
+      if (testResult != null) {
+        await _saveTestResult(testResult);
+      }
 
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
