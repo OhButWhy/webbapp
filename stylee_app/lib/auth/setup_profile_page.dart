@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
 import 'package:stylee_app/models/test_result.dart';
 import 'package:stylee_app/screens/home_page.dart';
+import 'package:stylee_app/services/backend_api_service.dart';
 
 class SetupProfilePage extends StatefulWidget {
   final String email;
@@ -24,6 +24,7 @@ class SetupProfilePage extends StatefulWidget {
 }
 
 class _SetupProfilePageState extends State<SetupProfilePage> {
+  final _backend = BackendApiService.instance;
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
   final _picker = ImagePicker();
@@ -53,13 +54,12 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
   Future<bool> _checkUsername(String username) async {
     if (username.isEmpty) return false;
-    
-    final snapshot = await FirebaseFirestore.instance
-        .collection('Users')
-        .where('username', isEqualTo: username)
-        .get();
-    
-    return snapshot.docs.isEmpty;
+
+    return _awaitUsernameAvailability(username);
+  }
+
+  Future<bool> _awaitUsernameAvailability(String username) {
+    return _backend.isUsernameAvailable(widget.email, username);
   }
 
   Future<void> _validateUsername() async {
@@ -116,17 +116,18 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
         }
       }
 
-      await FirebaseFirestore.instance.collection('Users').doc(widget.email).set({
-        'username': username,
-        'bio': _bioController.text.trim(),
-        'email': widget.email,
-        'profileImagePath': savedImagePath,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: widget.email,
         password: widget.password,
+      );
+
+      // Инициализировать юзера в бэкенде
+      await _backend.bootstrapUser(widget.email);
+      await _backend.saveProfile(
+        email: widget.email,
+        username: username,
+        bio: _bioController.text.trim(),
+        profileImagePath: savedImagePath,
       );
 
       // Начать прохождение теста
@@ -182,36 +183,19 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
     try {
       final randomUsername = 'user_${DateTime.now().millisecondsSinceEpoch}';
       
-      await FirebaseFirestore.instance.collection('Users').doc(widget.email).set({
-        'username': randomUsername,
-        'bio': '',
-        'email': widget.email,
-        'profileImagePath': null,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: widget.email,
         password: widget.password,
       );
 
-      // Начать прохождение теста
-      final testResult = await Navigator.push<TestResult?>(
-        context,
-        MaterialPageRoute(
-          builder: (context) => QuizWizard(
-            existingResult: null,
-            onComplete: (result) {
-              // Просто продолжаем, результат сохранится позже
-            },
-          ),
-        ),
+      // Инициализировать юзера в бэкенде с рандомным ником
+      await _backend.bootstrapUser(widget.email);
+      await _backend.saveProfile(
+        email: widget.email,
+        username: randomUsername,
+        bio: '',
+        profileImagePath: null,
       );
-
-      // Сохранить результат теста если есть
-      if (testResult != null) {
-        await _saveTestResult(testResult);
-      }
 
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(

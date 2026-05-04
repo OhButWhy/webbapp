@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:stylee_app/services/backend_api_service.dart';
 
 class FavoriteImagesScreen extends StatefulWidget {
   const FavoriteImagesScreen({super.key});
@@ -10,6 +10,7 @@ class FavoriteImagesScreen extends StatefulWidget {
 }
 
 class _FavoriteImagesScreenState extends State<FavoriteImagesScreen> {
+  final _backend = BackendApiService.instance;
   List<String> favoriteImages = [];
   bool loading = true;
 
@@ -28,11 +29,14 @@ class _FavoriteImagesScreenState extends State<FavoriteImagesScreen> {
       return;
     }
 
-    final doc = await FirebaseFirestore.instance.collection('Users').doc(user.email).get();
-    final data = doc.data();
     setState(() {
-      favoriteImages = List<String>.from(data?['favoriteImages'] ?? []);
+      // optimistic reset while loading new data
       loading = false;
+    });
+
+    final favorites = await _backend.getFavorites(user.email!);
+    setState(() {
+      favoriteImages = favorites;
     });
   }
 

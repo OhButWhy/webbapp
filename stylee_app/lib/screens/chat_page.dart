@@ -1,10 +1,12 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:stylee_app/models/dislike.dart';
+import 'package:stylee_app/services/backend_api_service.dart';
+import 'package:stylee_app/services/dislike_service.dart';
 import 'package:stylee_app/services/openrouter_service.dart';
 
 class ChatPage extends StatefulWidget {
@@ -18,34 +20,51 @@ class _ChatPageState extends State<ChatPage> {
   final currentUser = FirebaseAuth.instance.currentUser!;
   final TextEditingController _controller = TextEditingController();
   final ImagePicker _picker = ImagePicker();
+  final BackendApiService _backend = BackendApiService.instance;
+  final _dislikeService = DislikeService();
   bool _isLoading = false;
   bool _showSidebar = false;
   String? _selectedImagePath;
   
   String? _currentChatId;
   List<Map<String, dynamic>> _messages = [];
+  List<Dislike> _userDislikes = [];
 
   @override
   void initState() {
     super.initState();
     _loadLastChat();
+    _loadUserDislikes();
+  }
+
+  /// Загрузить дизлайки пользователя из Firestore
+  Future<void> _loadUserDislikes() async {
+    try {
+      final dislikes = await _dislikeService.getDislikes(currentUser.email!);
+      setState(() {
+        _userDislikes = dislikes;
+      });
+      if (mounted) {
+        print('Загружены дизлайки: ${dislikes.length}');
+      }
+    } catch (e) {
+      if (mounted) {
+        print('Ошибка загрузки дизлайков: $e');
+      }
+    }
   }
 
   Future<void> _loadLastChat() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('Users')
-          .doc(currentUser.email)
-          .collection('Chats')
-          .orderBy('createdAt', descending: true)
-          .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 5));
-      
-      if (snapshot.docs.isNotEmpty && mounted) {
-        final lastChat = snapshot.docs.first;
-        setState(() => _currentChatId = lastChat.id);
-        _loadMessages(lastChat.id);
+      await _backend.bootstrapUser(currentUser.email!);
+      final chats = await _backend.getChats(currentUser.email!);
+
+      if (chats.isNotEmpty && mounted) {
+        final lastChat = chats.first;
+        setState(() => _currentChatId = lastChat['id']?.toString());
+        if (_currentChatId != null) {
+          _loadMessages(_currentChatId!);
+        }
       }
     } catch (e) {
       // ignore: avoid_print
@@ -82,23 +101,19 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _loadMessages(String chatId) async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('Users')
-          .doc(currentUser.email)
-          .collection('Chats')
-          .doc(chatId)
-          .collection('Messages')
-          .orderBy('createdAt', descending: true)
-          .limit(50)
-          .get()
-          .timeout(const Duration(seconds: 5));
-      
+      final snapshot = await _backend.getMessages(currentUser.email!, chatId);
+
       if (mounted) {
         setState(() {
-          _messages = snapshot.docs.map((doc) {
-            final data = doc.data();
-            data['id'] = doc.id;
-            return data;
+          _messages = snapshot.map((message) {
+            return {
+              'id': message['id'],
+              'type': message['role'] ?? 'ai',
+              'title': message['title'],
+              'description': message['description'] ?? message['text'] ?? '',
+              'text': message['text'] ?? '',
+              'imagePath': message['image_path'] ?? message['imagePath'],
+            };
           }).toList();
         });
       }
@@ -110,19 +125,11 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _createNewChat() async {
     try {
-      final chatRef = await FirebaseFirestore.instance
-          .collection('Users')
-          .doc(currentUser.email)
-          .collection('Chats')
-          .add({
-        'title': 'Новый чат',
-        'createdAt': FieldValue.serverTimestamp(),
-        'lastMessage': '',
-      }).timeout(const Duration(seconds: 5));
+      final chat = await _backend.createChat(currentUser.email!, title: 'Новый чат');
       
       if (mounted) {
         setState(() {
-          _currentChatId = chatRef.id;
+          _currentChatId = chat['chatId']?.toString();
           _messages = [];
           _showSidebar = false;
         });
@@ -145,13 +152,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _deleteChat(String chatId) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('Users')
-          .doc(currentUser.email)
-          .collection('Chats')
-          .doc(chatId)
-          .delete()
-          .timeout(const Duration(seconds: 5));
+      await _backend.deleteChat(currentUser.email!, chatId);
       
       if (mounted && _currentChatId == chatId) {
         setState(() {
@@ -191,84 +192,27 @@ class _ChatPageState extends State<ChatPage> {
         }
       }
 
-      await FirebaseFirestore.instance
-          .collection('Users')
-          .doc(currentUser.email)
-          .collection('Chats')
-          .doc(_currentChatId)
-          .collection('Messages')
-          .add({
-        'type': isImage ? 'user_image' : 'user',
-        'text': userText,
-        'imagePath': savedImagePath,
-        'createdAt': FieldValue.serverTimestamp(),
-      }).timeout(const Duration(seconds: 5));
-
-      await FirebaseFirestore.instance
-          .collection('Users')
-          .doc(currentUser.email)
-          .collection('Chats')
-          .doc(_currentChatId)
-          .update({
-        'title': userText.isNotEmpty
-            ? (userText.length > 30 ? '${userText.substring(0, 30)}...' : userText)
-            : 'Фото',
-        'lastMessage': isImage ? '📷 Фото' : userText,
-        'lastMessageAt': FieldValue.serverTimestamp(),
-      }).timeout(const Duration(seconds: 5));
-
-      if (!mounted) return;
-      
-      setState(() {
-        _messages.insert(0, {
-          'type': isImage ? 'user_image' : 'user',
-          'text': userText,
-          'imagePath': savedImagePath,
-        });
-        _selectedImagePath = null;
-      });
-
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (!mounted) return;
-
-      // Получаем ответ от ИИ
       final openRouterService = OpenRouterService();
-      String aiText;
-
       if (isImage && savedImagePath != null) {
-        // С изображением — используем Qwen-VL
-        aiText = await openRouterService.getStyleAdviceWithImage(
+        await openRouterService.getStyleAdviceWithImage(
+          userEmail: currentUser.email!,
           userMessage: userText,
           imagePath: savedImagePath,
+          dislikes: _userDislikes,
         );
       } else {
-        // Только текст
-        aiText = await openRouterService.getStyleAdvice(userText);
+        await openRouterService.getStyleAdvice(
+          userText,
+          userEmail: currentUser.email!,
+          dislikes: _userDislikes,
+        );
       }
 
-      await FirebaseFirestore.instance
-          .collection('Users')
-          .doc(currentUser.email)
-          .collection('Chats')
-          .doc(_currentChatId)
-          .collection('Messages')
-          .add({
-        'type': 'ai',
-        'title': 'AI Recommendation',
-        'description': aiText,
-        'createdAt': FieldValue.serverTimestamp(),
-      }).timeout(const Duration(seconds: 5));
+      _selectedImagePath = null;
+      await _loadMessages(_currentChatId!);
 
       if (mounted) {
-        setState(() {
-          _messages.insert(0, {
-            'type': 'ai',
-            'title': 'AI Recommendation',
-            'description': aiText,
-          });
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       if (mounted) {
@@ -365,20 +309,24 @@ class _ChatPageState extends State<ChatPage> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('Users')
-                  .doc(currentUser.email)
-                  .collection('Chats')
-                  .orderBy('createdAt', descending: true)
-                  .snapshots(),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _backend.getChats(currentUser.email!),
               builder: (context, snapshot) {
-                if (!snapshot.hasData) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                
-                final chats = snapshot.data!.docs;
-                
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Ошибка загрузки чатов',
+                      style: TextStyle(color: Colors.grey.shade400),
+                    ),
+                  );
+                }
+
+                final chats = snapshot.data ?? [];
+
                 if (chats.isEmpty) {
                   return Center(
                     child: Text(
@@ -387,20 +335,20 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                   );
                 }
-                
+
                 return ListView.builder(
                   itemCount: chats.length,
                   itemBuilder: (context, index) {
-                    final chat = chats[index].data() as Map<String, dynamic>;
-                    final chatId = chats[index].id;
+                    final chat = chats[index];
+                    final chatId = chat['id']?.toString() ?? '';
                     final isSelected = chatId == _currentChatId;
-                    
+
                     return ListTile(
                       selected: isSelected,
                       selectedTileColor: Colors.pink.shade50,
                       leading: const Icon(Icons.chat_bubble_outline, size: 20),
                       title: Text(
-                        chat['title'] ?? 'Новый чат',
+                        chat['title']?.toString() ?? 'Новый чат',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -772,7 +720,7 @@ class _ChatPageState extends State<ChatPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        message['title'] ?? 'Recommendation',
+                        message['title']?.toString() ?? 'Recommendation',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -781,7 +729,7 @@ class _ChatPageState extends State<ChatPage> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        message['description'] ?? '',
+                        message['description']?.toString() ?? '',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey.shade700,
@@ -801,7 +749,7 @@ class _ChatPageState extends State<ChatPage> {
               const SizedBox(width: 8),
               _buildSmallButton(Icons.favorite_border, 'Like'),
               const SizedBox(width: 8),
-              _buildSmallButton(Icons.close, 'Dislike'),
+              _buildSmallButton(Icons.close, 'Dislike', onTap: () => _onDislike(message)),
             ],
           ),
         ],
@@ -809,7 +757,7 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildSmallButton(IconData icon, String label) {
+  Widget _buildSmallButton(IconData icon, String label, {VoidCallback? onTap}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -823,7 +771,7 @@ class _ChatPageState extends State<ChatPage> {
         ],
       ),
       child: OutlinedButton.icon(
-        onPressed: () {},
+        onPressed: onTap,
         icon: Icon(icon, size: 16, color: Colors.black87),
         label: Text(
           label,
@@ -941,13 +889,15 @@ class _ChatPageState extends State<ChatPage> {
               ),
               const SizedBox(width: 12),
               GestureDetector(
-                onTap: _isLoading ? null : () {
-                  if (_selectedImagePath != null && File(_selectedImagePath!).existsSync()) {
-                    _attachImage();
-                  } else {
-                    _sendMessage();
-                  }
-                },
+                onTap: _isLoading
+                    ? null
+                    : () {
+                        if (_selectedImagePath != null && File(_selectedImagePath!).existsSync()) {
+                          _attachImage();
+                        } else {
+                          _sendMessage();
+                        }
+                      },
                 child: Container(
                   width: 44,
                   height: 44,
@@ -979,4 +929,39 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
   }
-}
+
+  /// Обработчик для кнопки Dislike
+  Future<void> _onDislike(Map<String, dynamic> message) async {
+    try {
+      final description = message['description']?.toString().isNotEmpty == true
+          ? message['description'].toString()
+          : 'Неизвестный товар';
+
+      await _dislikeService.saveDisilike(
+        userEmail: currentUser.email!,
+        description: description,
+        category: 'recommendation',
+      );
+
+      await _loadUserDislikes();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Запомнили! Будем избегать похожих рекомендаций'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
