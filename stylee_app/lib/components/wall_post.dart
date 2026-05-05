@@ -26,9 +26,7 @@ class WallPost extends StatefulWidget {
   State<WallPost> createState() => _WallPostState();
 }
 
-class _WallPostState extends State<WallPost>{
-
-  // user
+class _WallPostState extends State<WallPost> {
   final currentUser = FirebaseAuth.instance.currentUser!;
   bool isLiked = false;
 
@@ -38,23 +36,18 @@ class _WallPostState extends State<WallPost>{
     isLiked = widget.likes.contains(currentUser.email);
   }
 
-  // toggle like
   void toggleLike() {
     setState(() {
       isLiked = !isLiked;
     });
 
-    // Access the document is Firebase
-    DocumentReference postRef = 
-        FirebaseFirestore.instance.collection("User Posts").doc(widget.postId);
+    final postRef = FirebaseFirestore.instance.collection("User Posts").doc(widget.postId);
 
-    if (isLiked){
-      // if the post is now liked, add the user's email to the 'Likes' field
+    if (isLiked) {
       postRef.update({
         'Likes': FieldValue.arrayUnion([currentUser.email]),
       });
-    } else{
-      // if the post is now unliked, remove the user's email from the 'Likes'
+    } else {
       postRef.update({
         'Likes': FieldValue.arrayRemove([currentUser.email]),
       });
@@ -63,30 +56,29 @@ class _WallPostState extends State<WallPost>{
 
   @override
   Widget build(BuildContext context) {
-    return Container( 
+    return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
       ),
-      margin: EdgeInsets.only(top: 25, left:25, right:25),
-      padding: EdgeInsets.all(25),
+      margin: const EdgeInsets.only(top: 25, left: 25, right: 25),
+      padding: const EdgeInsets.all(25),
       child: Row(
         children: [
           // profile pic
-          Container(  
-            decoration: 
-            BoxDecoration(
+          Container(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.grey[400],
             ),
-            padding: EdgeInsets.all(10),
-            child: Icon(
+            padding: const EdgeInsets.all(10),
+            child: const Icon(
               Icons.person,
               color: Colors.white,
             ),
           ),
 
-          const SizedBox(width: 20,),
+          const SizedBox(width: 20),
 
           Expanded(
             child: Column(
@@ -94,7 +86,7 @@ class _WallPostState extends State<WallPost>{
               children: [
                 Text(
                   widget.user,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.pink,
                   ),
                 ),
@@ -115,25 +107,21 @@ class _WallPostState extends State<WallPost>{
               ],
             ),
           ),
-          const SizedBox(width: 20,),
+          const SizedBox(width: 20),
 
           Column(
             children: [
-              // like button
               LikeButton(
-                isLiked: isLiked, 
+                isLiked: isLiked,
+                likeCount: widget.likes.length,
                 onTap: toggleLike,
               ),
-              const SizedBox(height: 5),
-              // like count
-              Text(widget.likes.length.toString()),
               const SizedBox(height: 10),
-              // favorite button
               FavoritePostButton(imageUrl: widget.imageUrl),
             ],
           )
         ],
-      )
+      ),
     );
   }
 }

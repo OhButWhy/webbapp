@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:stylee_app/services/backend_api_service.dart';
 import '../models/outfit.dart';
 import '../models/outfit_list.dart';
 
@@ -12,6 +12,7 @@ class OutfitPickerScreen extends StatefulWidget {
 }
 
 class _OutfitPickerScreenState extends State<OutfitPickerScreen> {
+  final _backend = BackendApiService.instance;
   List<String> favoriteImages = [];
   bool loadingFavorites = true;
     @override
@@ -28,10 +29,9 @@ class _OutfitPickerScreenState extends State<OutfitPickerScreen> {
         });
         return;
       }
-      final doc = await FirebaseFirestore.instance.collection('Users').doc(user.email).get();
-      final data = doc.data();
+      final favorites = await _backend.getFavorites(user.email!);
       setState(() {
-        favoriteImages = List<String>.from(data?['favoriteImages'] ?? []);
+        favoriteImages = favorites;
         loadingFavorites = false;
       });
     }
@@ -39,7 +39,6 @@ class _OutfitPickerScreenState extends State<OutfitPickerScreen> {
     Future<void> _toggleFavorite(String imageUrl) async {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      final docRef = FirebaseFirestore.instance.collection('Users').doc(user.email);
       final isFavorite = favoriteImages.contains(imageUrl);
       setState(() {
         if (isFavorite) {
@@ -48,14 +47,12 @@ class _OutfitPickerScreenState extends State<OutfitPickerScreen> {
           favoriteImages.add(imageUrl);
         }
       });
-      await docRef.set(
-        {
-          'favoriteImages': isFavorite
-              ? FieldValue.arrayRemove([imageUrl])
-              : FieldValue.arrayUnion([imageUrl])
-        },
-        SetOptions(merge: true),
-      );
+
+      if (isFavorite) {
+        await _backend.removeFavorite(user.email!, imageUrl);
+      } else {
+        await _backend.addFavorite(user.email!, imageUrl);
+      }
     }
   String? selectedEvent;
   String? selectedWeather;

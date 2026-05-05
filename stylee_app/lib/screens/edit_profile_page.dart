@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:stylee_app/services/backend_api_service.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -14,7 +14,7 @@ class EditProfilePage extends StatefulWidget {
 
 class _EditProfilePageState extends State<EditProfilePage> {
   final currentUser = FirebaseAuth.instance.currentUser!;
-  final usersCollection = FirebaseFirestore.instance.collection("Users");
+  final _backend = BackendApiService.instance;
   final _picker = ImagePicker();
   
   final _usernameController = TextEditingController();
@@ -33,13 +33,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _loadProfileData() async {
     try {
-      final doc = await usersCollection.doc(currentUser.email).get();
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
+      final data = await _backend.getProfile(currentUser.email!);
+      if (data.isNotEmpty) {
         setState(() {
-          _usernameController.text = data['username'] ?? '';
-          _bioController.text = data['bio'] ?? '';
-          _profileImagePath = data['profileImagePath'];
+          _usernameController.text = data['username']?.toString() ?? '';
+          _bioController.text = data['bio']?.toString() ?? '';
+          _profileImagePath = data['profileImagePath']?.toString();
         });
       }
     } catch (e) {
@@ -68,18 +67,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<bool> _checkUsername(String username) async {
     if (username.isEmpty) return false;
-    
-    final currentDoc = await usersCollection.doc(currentUser.email).get();
-    final currentUsername = currentDoc.data()?['username'];
-    
-    // Если ник не менялся, считаем доступным
-    if (username == currentUsername) return true;
-    
-    final snapshot = await usersCollection
-        .where('username', isEqualTo: username)
-        .get();
-    
-    return snapshot.docs.isEmpty;
+
+    return _backend.isUsernameAvailable(currentUser.email!, username);
   }
 
   Future<void> _validateUsername() async {
@@ -127,11 +116,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         }
       }
 
-      await usersCollection.doc(currentUser.email).update({
-        'username': username,
-        'bio': bio,
-        'profileImagePath': savedImagePath,
-      });
+      await _backend.saveProfile(
+        email: currentUser.email!,
+        username: username,
+        bio: bio,
+        profileImagePath: savedImagePath,
+      );
 
       if (mounted) {
         Navigator.pop(context, true);

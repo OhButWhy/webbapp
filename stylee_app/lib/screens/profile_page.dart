@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:stylee_app/screens/edit_profile_page.dart';
+import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
+import 'package:stylee_app/models/test_result.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -327,6 +329,10 @@ class _ProfilePageState extends State<ProfilePage> {
                             indent: 0,
                             endIndent: 0,
                           ),
+                          const SizedBox(height: 16),
+                          // Кнопка теста персонализации
+                          _buildQuizButton(context, userData),
+                          const SizedBox(height: 24),
                         ],
                       ),
                     ),
@@ -376,6 +382,89 @@ class _ProfilePageState extends State<ProfilePage> {
 
             return const Center(child: CircularProgressIndicator());
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuizButton(BuildContext context, Map<String, dynamic> userData) {
+    final hasCompleted = userData['hasCompletedTest'] == true;
+    return GestureDetector(
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => QuizWizard(
+              existingResult: hasCompleted && userData['testResult'] != null
+                  ? TestResult.fromMap(userData['testResult'] as Map<String, dynamic>)
+                  : null,
+              onComplete: (newResult) async {
+                await usersCollection.doc(currentUser.email).update({
+                  'testResult': newResult.toMap(),
+                  'hasCompletedTest': true,
+                }).timeout(const Duration(seconds: 5));
+                if (mounted) {
+                  setState(() {});
+                }
+              },
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFE91E63), Color(0xFFFF6B9D)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE91E63).withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.auto_fix_high, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasCompleted ? 'Перепройти тест персонализации' : 'Пройти тест персонализации',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasCompleted ? 'Обновите свой стиль' : 'Получите рекомендации от AI',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white),
+          ],
         ),
       ),
     );

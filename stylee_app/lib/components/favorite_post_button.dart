@@ -59,10 +59,36 @@ class _FavoritePostButtonState extends State<FavoritePostButton> {
   @override
   Widget build(BuildContext context) {
     if (loading) return const SizedBox(height: 24, width: 24);
-    return IconButton(
-      icon: Icon(isFavorite ? Icons.bookmark : Icons.bookmark_border, color: isFavorite ? Colors.pink : null),
-      tooltip: isFavorite ? 'Убрать из избранного' : 'В избранное',
-      onPressed: widget.imageUrl.isEmpty ? null : _toggleFavorite,
+    return GestureDetector(
+      onTap: widget.imageUrl.isEmpty ? null : _toggleFavorite,
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.black.withValues(alpha: 0.3),
+            ),
+            child: Center(
+              child: Icon(
+                isFavorite ? Icons.bookmark : Icons.bookmark_border,
+                color: isFavorite ? Colors.pink : Colors.white,
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isFavorite ? 'Saved' : '',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
