@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Добавили импорт
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -33,6 +34,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _loadProfileData() async {
     try {
+      // Загружаем данные с бэкенда (источник правды)
       final data = await _backend.getProfile(currentUser.email!);
       if (data.isNotEmpty) {
         setState(() {
@@ -42,7 +44,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         });
       }
     } catch (e) {
-      // ignore: avoid_print
       print('Error loading profile: $e');
     }
   }
@@ -60,14 +61,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         setState(() => _newImagePath = image.path);
       }
     } catch (e) {
-      // ignore: avoid_print
       print('Error picking image: $e');
     }
   }
 
   Future<bool> _checkUsername(String username) async {
     if (username.isEmpty) return false;
-
     return _backend.isUsernameAvailable(currentUser.email!, username);
   }
 
@@ -105,6 +104,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       String? savedImagePath = _profileImagePath;
       
+      // Если выбрали новое фото, сохраняем его локально
       if (_newImagePath != null) {
         final directory = await getApplicationDocumentsDirectory();
         final fileName = 'profile_${currentUser.email!.replaceAll('@', '_').replaceAll('.', '_')}.jpg';
@@ -116,6 +116,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         }
       }
 
+      // 1. Сохраняем в Python-бэкенд (SQLite)
       await _backend.saveProfile(
         email: currentUser.email!,
         username: username,
@@ -123,8 +124,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
         profileImagePath: savedImagePath,
       );
 
+      // 2. ДУБЛИРУЕМ в Firebase Firestore, чтобы UI обновился мгновенно
+      await FirebaseFirestore.instance.collection('Users').doc(currentUser.email).set({
+        'username': username,
+        'bio': bio,
+        'profileImagePath': savedImagePath,
+        'email': currentUser.email, // На всякий случай
+      }, SetOptions(merge: true));
+
       if (mounted) {
-        Navigator.pop(context, true);
+        Navigator.pop(context, true); // Возвращаем true, чтобы профиль знал об успехе
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Профиль обновлён!')),
         );

@@ -32,7 +32,7 @@ async def scrape_weather(city, month,  day):
                 await browser.close()
                 return clean_desc
             else:
-                print("❌ Описание не найдено. Делаю скриншот для проверки...")
+                print("Описание не найдено. Делаю скриншот для проверки...")
                 await page.screenshot(path="debug_no_desc.png")
                 await browser.close()
                 return None

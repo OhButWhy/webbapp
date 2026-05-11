@@ -4,7 +4,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:stylee_app/auth/auth.dart';
 import 'package:stylee_app/firebase_options.dart';
 import 'package:stylee_app/screens/outfit_picker_screen.dart';
-import 'package:stylee_app/screens/style_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,7 +26,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       routes: {
         '/outfit_picker': (context) => const OutfitPickerScreen(),
-        '/style_screen': (context) => const StyleScreen(),
+        // '/style_screen': (context) => const StyleScreen(),
       },
       home: const AuthPage(),
     );

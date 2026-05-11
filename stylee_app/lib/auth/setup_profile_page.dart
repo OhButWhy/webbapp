@@ -8,6 +8,7 @@ import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
 import 'package:stylee_app/models/test_result.dart';
 import 'package:stylee_app/screens/home_page.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SetupProfilePage extends StatefulWidget {
   final String email;

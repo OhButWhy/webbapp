@@ -8,6 +8,7 @@ import 'package:stylee_app/screens/editor_page.dart';
 import 'package:stylee_app/screens/edit_profile_page.dart';
 import 'package:stylee_app/screens/profile_page.dart';
 import 'package:stylee_app/screens/wardrobe_page.dart';
+import 'dart:io';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -129,7 +130,7 @@ class _HomePageState extends State<HomePage> {
                       MaterialPageRoute(builder: (context) => const EditProfilePage()),
                     );
                     if (result == true && mounted) {
-                      setState(() {}); // Обновляем профиль
+                      setState(() {});
                     }
                   },
                   child: Text(
@@ -246,83 +247,87 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildWallFeed() {
-    return StreamBuilder(
+    return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection("User Posts")
-          .orderBy("TimeStamp", descending: true)
+          .collection("posts")
+          .orderBy("createdAt", descending: true)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          final posts = snapshot.data!.docs;
-          if (posts.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.local_fire_department_outlined,
-                    size: 80,
-                    color: Colors.pink.shade300,
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Лента пуста',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Подпишитесь на стилистов\nили создайте первый пост',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-          return PageView.builder(
-            scrollDirection: Axis.vertical,
-            itemCount: posts.length,
-            itemBuilder: (context, index) {
-              final post = posts[index];
-              return _TikTokStylePost(
-                post: post,
-                currentIndex: index,
-                totalPosts: posts.length,
-              );
-            },
-          );
-        } else if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+        if (snapshot.hasError) {
+          return Center(child: Text('Ошибка: ${snapshot.error}'));
         }
-        return const Center(child: CircularProgressIndicator());
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.local_fire_department_outlined,
+                  size: 80,
+                  color: Colors.pink.shade300,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Лента пуста',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Подпишитесь на стилистов\nили создайте первый пост',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final posts = snapshot.data!.docs;
+
+        return PageView.builder(
+          scrollDirection: Axis.vertical,
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            return _TikTokStylePostFromFirestore(
+              post: post,
+              currentIndex: index,
+              totalPosts: posts.length,
+            );
+          },
+        );
       },
     );
   }
 }
 
-class _TikTokStylePost extends StatefulWidget {
+// ============================================================================
+// ВИДЖЕТ ПОСТА ИЗ FIRESTORE (замена старому _TikTokStylePost)
+// ============================================================================
+class _TikTokStylePostFromFirestore extends StatefulWidget {
   final QueryDocumentSnapshot post;
   final int currentIndex;
   final int totalPosts;
 
-  const _TikTokStylePost({
+  const _TikTokStylePostFromFirestore({
     required this.post,
     required this.currentIndex,
     required this.totalPosts,
   });
 
   @override
-  State<_TikTokStylePost> createState() => _TikTokStylePostState();
+  State<_TikTokStylePostFromFirestore> createState() => _TikTokStylePostFromFirestoreState();
 }
 
-class _TikTokStylePostState extends State<_TikTokStylePost> {
+class _TikTokStylePostFromFirestoreState extends State<_TikTokStylePostFromFirestore> {
   final currentUser = FirebaseAuth.instance.currentUser!;
   bool isLiked = false;
   late List<String> likes;
@@ -345,7 +350,7 @@ class _TikTokStylePostState extends State<_TikTokStylePost> {
     });
 
     DocumentReference postRef = FirebaseFirestore.instance
-        .collection("User Posts")
+        .collection("posts")
         .doc(widget.post.id);
 
     postRef.update({
@@ -357,16 +362,44 @@ class _TikTokStylePostState extends State<_TikTokStylePost> {
 
   @override
   Widget build(BuildContext context) {
-    final userEmail = widget.post['UserEmail'] ?? 'Anonymous';
-    final message = widget.post['Message'] ?? '';
-    final timestamp = widget.post['TimeStamp'] as Timestamp?;
+    final userEmail = widget.post['userEmail'] ?? 'Anonymous';
+    final caption = widget.post['caption'] ?? '';
+    final imageUrl = widget.post['imageUrl'] as String?;
+    final timestamp = widget.post['createdAt'] as Timestamp?;
     
     return Container(
       color: Colors.black,
       child: Stack(
         children: [
-          // Основное изображение (карусель из 3 фото)
-          _buildImageCarousel(),
+          // Изображение из поста (локальный файл)
+          imageUrl != null && imageUrl.isNotEmpty && File(imageUrl).existsSync()
+              ? Image.file(
+                  File(imageUrl),
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey.shade800,
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported, color: Colors.grey, size: 50),
+                      ),
+                    );
+                  },
+                )
+              : Container(
+                  color: Colors.grey.shade800,
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.image, color: Colors.grey, size: 50),
+                        SizedBox(height: 8),
+                        Text('Нет фото', style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ),
           
           // Градиент снизу для читаемости текста
           Positioned(
@@ -400,7 +433,7 @@ class _TikTokStylePostState extends State<_TikTokStylePost> {
             left: 16,
             right: 80,
             bottom: 24,
-            child: _buildPostInfo(userEmail, message, timestamp),
+            child: _buildPostInfo(userEmail, caption, timestamp),
           ),
           
           // Счётчик постов сверху
@@ -425,31 +458,6 @@ class _TikTokStylePostState extends State<_TikTokStylePost> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildImageCarousel() {
-    // Демо: 3 placeholder изображения одежды
-    final images = [
-      'https://images.unsplash.com/photo-1434389677669-e08b4cda3a98?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=400&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&h=600&fit=crop',
-    ];
-
-    return PageView.builder(
-      itemCount: images.length,
-      itemBuilder: (context, imgIndex) {
-        return Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              image: NetworkImage(images[imgIndex]),
-              fit: BoxFit.cover,
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -548,7 +556,7 @@ class _TikTokStylePostState extends State<_TikTokStylePost> {
     );
   }
 
-  Widget _buildPostInfo(String userEmail, String message, Timestamp? timestamp) {
+  Widget _buildPostInfo(String userEmail, String caption, Timestamp? timestamp) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -584,9 +592,9 @@ class _TikTokStylePostState extends State<_TikTokStylePost> {
         const SizedBox(height: 8),
         
         // Описание поста
-        if (message.isNotEmpty)
+        if (caption.isNotEmpty)
           Text(
-            message,
+            caption,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
