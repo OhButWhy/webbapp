@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -36,6 +38,22 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    } on FirebaseAuthMultiFactorException catch (e) {
+      try {
+        final resolved = await _resolveMultiFactorSignIn(e);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+
+        if (!resolved && mounted) {
+          _showError('Не удалось подтвердить второй фактор');
+        }
+      } catch (error) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _showError('Ошибка двухфакторной аутентификации: $error');
+        }
+      }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -52,6 +70,119 @@ class _LoginPageState extends State<LoginPage> {
         _showError(message);
       }
     }
+  }
+
+  Future<String?> _promptForSmsCode({
+    required String title,
+    required String message,
+  }) async {
+    final smsCodeController = TextEditingController();
+    final code = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(message),
+            const SizedBox(height: 16),
+            TextField(
+              controller: smsCodeController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                hintText: 'Код из SMS',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, smsCodeController.text.trim()),
+            child: const Text('Подтвердить'),
+          ),
+        ],
+      ),
+    );
+    smsCodeController.dispose();
+    return code;
+  }
+
+  Future<bool> _resolveMultiFactorSignIn(FirebaseAuthMultiFactorException error) async {
+    final resolver = error.resolver;
+    final phoneHints = resolver.hints.whereType<PhoneMultiFactorInfo>().toList();
+    if (phoneHints.isEmpty) {
+      return false;
+    }
+
+    final phoneHint = phoneHints.first;
+    final completer = Completer<bool>();
+
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      multiFactorInfo: phoneHint,
+      multiFactorSession: resolver.session,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        try {
+          final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
+          await resolver.resolveSignIn(assertion);
+          if (!completer.isCompleted) {
+            completer.complete(true);
+          }
+        } catch (e) {
+          if (!completer.isCompleted) {
+            completer.complete(false);
+          }
+        }
+      },
+      verificationFailed: (FirebaseAuthException error) {
+        if (!completer.isCompleted) {
+          completer.complete(false);
+        }
+        if (mounted) {
+          _showError('Ошибка подтверждения второго фактора: ${error.message ?? error.code}');
+        }
+      },
+      codeSent: (String verificationId, int? resendToken) async {
+        final smsCode = await _promptForSmsCode(
+          title: 'Подтверждение входа',
+          message: 'На номер ${phoneHint.phoneNumber} отправлен SMS-код. Введите его, чтобы завершить вход.',
+        );
+
+        if (smsCode == null || smsCode.isEmpty) {
+          if (!completer.isCompleted) {
+            completer.complete(false);
+          }
+          return;
+        }
+
+        try {
+          final phoneCredential = PhoneAuthProvider.credential(
+            verificationId: verificationId,
+            smsCode: smsCode,
+          );
+          final assertion = PhoneMultiFactorGenerator.getAssertion(phoneCredential);
+          await resolver.resolveSignIn(assertion);
+          if (!completer.isCompleted) {
+            completer.complete(true);
+          }
+        } catch (e) {
+          if (!completer.isCompleted) {
+            completer.complete(false);
+          }
+          if (mounted) {
+            _showError('Не удалось подтвердить второй фактор: $e');
+          }
+        }
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {},
+    );
+
+    return await completer.future.timeout(const Duration(minutes: 2), onTimeout: () => false);
   }
 
   void _showError(String message) {

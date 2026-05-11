@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -28,12 +29,14 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
   final _backend = BackendApiService.instance;
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
+  final _twoFactorPhoneController = TextEditingController();
   final _picker = ImagePicker();
   
   String? _profileImagePath;
   bool _isLoading = false;
   bool _checkingUsername = false;
   String? _usernameError;
+  bool _enableTwoFactor = false;
 
   Future<void> _pickImage() async {
     try {
@@ -138,7 +141,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
           builder: (context) => QuizWizard(
             existingResult: null,
             onComplete: (result) {
-              // Просто продолжаем, результат сохранится позже
+              Navigator.of(context).pop(result);
             },
           ),
         ),
@@ -147,6 +150,10 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
       // Сохранить результат теста если есть
       if (testResult != null) {
         await _saveTestResult(testResult);
+      }
+
+      if (_enableTwoFactor) {
+        await _setupTwoFactorAuthentication();
       }
 
       if (mounted) {
@@ -167,12 +174,144 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
   Future<void> _saveTestResult(TestResult result) async {
     try {
-      await FirebaseFirestore.instance.collection('Users').doc(widget.email).update({
-        'testResult': result.toMap(),
-        'hasCompletedTest': true,
-      }).timeout(const Duration(seconds: 5));
+      await _backend.saveTestResult(widget.email, result.toMap());
     } catch (e) {
       print('Error saving test result: $e');
+    }
+  }
+
+  Future<String?> _promptForSmsCode({
+    required String title,
+    required String message,
+  }) async {
+    final smsCodeController = TextEditingController();
+    final code = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(message),
+            const SizedBox(height: 16),
+            TextField(
+              controller: smsCodeController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                hintText: 'Код из SMS',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, smsCodeController.text.trim()),
+            child: const Text('Подтвердить'),
+          ),
+        ],
+      ),
+    );
+    smsCodeController.dispose();
+    return code;
+  }
+
+  Future<bool> _setupTwoFactorAuthentication() async {
+    final phoneNumber = _twoFactorPhoneController.text.trim();
+    if (phoneNumber.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Введите номер телефона для 2FA или отключите эту опцию')),
+        );
+      }
+      return false;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return false;
+    }
+
+    try {
+      final session = await user.multiFactor.getSession();
+      final completer = Completer<bool>();
+
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        multiFactorSession: session,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          try {
+            final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
+            await user.multiFactor.enroll(assertion, displayName: 'Phone');
+            if (!completer.isCompleted) {
+              completer.complete(true);
+            }
+          } catch (e) {
+            if (!completer.isCompleted) {
+              completer.complete(false);
+            }
+          }
+        },
+        verificationFailed: (FirebaseAuthException error) {
+          if (!completer.isCompleted) {
+            completer.complete(false);
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Не удалось включить 2FA: ${error.message ?? error.code}')),
+            );
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) async {
+          final smsCode = await _promptForSmsCode(
+            title: 'Подтвердите 2FA',
+            message: 'Мы отправили SMS на $phoneNumber. Введите код для включения двухфакторной аутентификации.',
+          );
+
+          if (smsCode == null || smsCode.isEmpty) {
+            if (!completer.isCompleted) {
+              completer.complete(false);
+            }
+            return;
+          }
+
+          try {
+            final credential = PhoneAuthProvider.credential(
+              verificationId: verificationId,
+              smsCode: smsCode,
+            );
+            final assertion = PhoneMultiFactorGenerator.getAssertion(credential);
+            await user.multiFactor.enroll(assertion, displayName: 'Phone');
+            if (!completer.isCompleted) {
+              completer.complete(true);
+            }
+          } catch (e) {
+            if (!completer.isCompleted) {
+              completer.complete(false);
+            }
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Ошибка подтверждения 2FA: $e')),
+              );
+            }
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {},
+      );
+
+      return await completer.future.timeout(const Duration(minutes: 2), onTimeout: () => false);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось включить 2FA: $e')),
+        );
+      }
+      return false;
     }
   }
 
@@ -218,6 +357,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
   void dispose() {
     _usernameController.dispose();
     _bioController.dispose();
+    _twoFactorPhoneController.dispose();
     super.dispose();
   }
 
@@ -402,6 +542,57 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _enableTwoFactor,
+                onChanged: _isLoading
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _enableTwoFactor = value;
+                        });
+                      },
+                title: const Text(
+                  'Двухфакторная аутентификация',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                subtitle: const Text('Необязательно: подтверждение входа через SMS'),
+                activeColor: const Color(0xFFE91E63),
+              ),
+              if (_enableTwoFactor) ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _twoFactorPhoneController,
+                  enabled: !_isLoading,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    hintText: 'Телефон в формате +79991234567',
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.phone_android_rounded,
+                      color: Colors.pink.shade300,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'После включения вход будет подтверждаться кодом из SMS.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
               const SizedBox(height: 40),
               // Кнопка продолжить
               SizedBox(
