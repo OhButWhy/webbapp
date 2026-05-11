@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:stylee_app/screens/login_page.dart';
 import 'package:stylee_app/screens/register_page.dart';
+import 'package:stylee_app/screens/forgot_password_page.dart';
 
 class LoginOrRegister extends StatefulWidget {
   const LoginOrRegister({super.key});
@@ -10,24 +11,47 @@ class LoginOrRegister extends StatefulWidget {
 }
 
 class _LoginOrRegisterState extends State<LoginOrRegister> {
+  // Страницы: 0 = Login, 1 = Register, 2 = Forgot Password
+  int _currentPage = 0;
 
-  // initially, show the login page
-
-  bool showLoginPage = true;
-
-  // toggle between login and register page
+  // Переключение на страницу регистрации/логина
   void togglePages() {
     setState(() {
-      showLoginPage = !showLoginPage;
+      _currentPage = _currentPage == 0 ? 1 : 0;
+    });
+  }
+
+  // Переключение на страницу восстановления пароля
+  void goToForgotPassword() {
+    setState(() {
+      _currentPage = 2;
+    });
+  }
+
+  // Возврат на логин со страницы восстановления пароля
+  void backToLogin() {
+    setState(() {
+      _currentPage = 0;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (showLoginPage){
-      return LoginPage(onTap: togglePages);
-    } else{
-      return RegisterPage(onTap: togglePages);
+    switch (_currentPage) {
+      case 0:
+        return LoginPage(
+          onTap: togglePages,
+          onForgotPassword: goToForgotPassword,
+        );
+      case 1:
+        return RegisterPage(onTap: togglePages);
+      case 2:
+        return ForgotPasswordPage(onTap: backToLogin);
+      default:
+        return LoginPage(
+          onTap: togglePages,
+          onForgotPassword: goToForgotPassword,
+        );
     }
   }
 }

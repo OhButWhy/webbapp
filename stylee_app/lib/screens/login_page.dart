@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 
 class LoginPage extends StatefulWidget {
   final Function()? onTap;
+  final Function()? onForgotPassword;
   const LoginPage({
     super.key,
     required this.onTap,
+    this.onForgotPassword,
   });
 
   @override
@@ -192,7 +194,7 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 24),
                 // forgot password
                 TextButton(
-                  onPressed: () {},
+                  onPressed: widget.onForgotPassword,
                   child: Text(
                     'Забыли пароль?',
                     style: TextStyle(
