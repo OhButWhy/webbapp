@@ -31,7 +31,6 @@ class _HomePageState extends State<HomePage> {
   final List<String> _weatherOptions = ['жарко', 'прохладно', 'дождь'];
   final List<String> _colorOptions = ['чёрный', 'белый', 'красный', 'синий', 'серый', 'голубой'];
 
-  // Кэш для данных пользователей
   final Map<String, Map<String, dynamic>> _usersCache = {};
 
   void _onBottomNavTap(int index) {
@@ -39,9 +38,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<Map<String, dynamic>> _getUserData(String email) async {
-    if (_usersCache.containsKey(email)) {
-      return _usersCache[email]!;
-    }
+    if (_usersCache.containsKey(email)) return _usersCache[email]!;
     try {
       final doc = await FirebaseFirestore.instance.collection('Users').doc(email).get();
       if (doc.exists && doc.data() != null) {
@@ -49,30 +46,24 @@ class _HomePageState extends State<HomePage> {
         return doc.data()!;
       }
     } catch (e) {
-      print('Error getting user  $e');
+      print('Error getting user $e');
     }
     return {'username': email.split('@').first, 'profileImagePath': null};
   }
 
-  // Функция переключения лайка
   Future<void> _toggleLike(String docId) async {
     try {
       final postRef = FirebaseFirestore.instance.collection('posts').doc(docId);
       final postSnap = await postRef.get();
-      
       if (!postSnap.exists) return;
       
       final likesList = postSnap.data()?['Likes'] as List<dynamic>? ?? [];
       final isCurrentlyLiked = likesList.contains(currentUser.email);
 
       if (isCurrentlyLiked) {
-        await postRef.update({
-          'Likes': FieldValue.arrayRemove([currentUser.email]),
-        });
+        await postRef.update({'Likes': FieldValue.arrayRemove([currentUser.email])});
       } else {
-        await postRef.update({
-          'Likes': FieldValue.arrayUnion([currentUser.email]),
-        });
+        await postRef.update({'Likes': FieldValue.arrayUnion([currentUser.email])});
       }
     } catch (e) {
       print('Error toggling like in feed: $e');
@@ -86,15 +77,9 @@ class _HomePageState extends State<HomePage> {
     if (!_hasActiveFeedFilters) return true;
     final data = post.data() as Map<String, dynamic>;
 
-    final events = (data['events'] is List)
-      ? (data['events'] as List).whereType<String>().toList()
-      : const <String>[];
-    final weathers = (data['weathers'] is List)
-      ? (data['weathers'] as List).whereType<String>().toList()
-      : const <String>[];
-    final colors = (data['colors'] is List)
-      ? (data['colors'] as List).whereType<String>().toList()
-      : const <String>[];
+    final events = (data['events'] is List) ? (data['events'] as List).whereType<String>().toList() : const <String>[];
+    final weathers = (data['weathers'] is List) ? (data['weathers'] as List).whereType<String>().toList() : const <String>[];
+    final colors = (data['colors'] is List) ? (data['colors'] as List).whereType<String>().toList() : const <String>[];
 
     final matchesEvent = _feedEventFilter == null || events.contains(_feedEventFilter);
     final matchesWeather = _feedWeatherFilter == null || weathers.contains(_feedWeatherFilter);
@@ -111,91 +96,37 @@ class _HomePageState extends State<HomePage> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) => SafeArea(
         child: StatefulBuilder(
           builder: (context, setModalState) => Padding(
             padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+              left: 16, right: 16, top: 16, bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Фильтры ленты',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
+                const Text('Фильтры ленты', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String?>(
                   value: selectedEvent,
-                  decoration: InputDecoration(
-                    labelText: 'Мероприятие',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  items: [null, ..._eventOptions]
-                      .map(
-                        (e) => DropdownMenuItem<String?>(
-                          value: e,
-                          child: Text(e ?? 'Не выбрано'),
-                        ),
-                      )
-                      .toList(),
+                  decoration: _dropdownDecoration('Мероприятие'),
+                  items: [null, ..._eventOptions].map((e) => DropdownMenuItem<String?>(value: e, child: Text(e ?? 'Не выбрано'))).toList(),
                   onChanged: (v) => setModalState(() => selectedEvent = v),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String?>(
                   value: selectedWeather,
-                  decoration: InputDecoration(
-                    labelText: 'Погода',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  items: [null, ..._weatherOptions]
-                      .map(
-                        (e) => DropdownMenuItem<String?>(
-                          value: e,
-                          child: Text(e ?? 'Не выбрано'),
-                        ),
-                      )
-                      .toList(),
+                  decoration: _dropdownDecoration('Погода'),
+                  items: [null, ..._weatherOptions].map((e) => DropdownMenuItem<String?>(value: e, child: Text(e ?? 'Не выбрано'))).toList(),
                   onChanged: (v) => setModalState(() => selectedWeather = v),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String?>(
                   value: selectedColor,
-                  decoration: InputDecoration(
-                    labelText: 'Цвет',
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  items: [null, ..._colorOptions]
-                      .map(
-                        (e) => DropdownMenuItem<String?>(
-                          value: e,
-                          child: Text(e ?? 'Не выбрано'),
-                        ),
-                      )
-                      .toList(),
+                  decoration: _dropdownDecoration('Цвет'),
+                  items: [null, ..._colorOptions].map((e) => DropdownMenuItem<String?>(value: e, child: Text(e ?? 'Не выбрано'))).toList(),
                   onChanged: (v) => setModalState(() => selectedColor = v),
                 ),
                 const SizedBox(height: 16),
@@ -225,10 +156,7 @@ class _HomePageState extends State<HomePage> {
                           });
                           Navigator.pop(context);
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE91E63),
-                          foregroundColor: Colors.white,
-                        ),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE91E63), foregroundColor: Colors.white),
                         child: const Text('Применить'),
                       ),
                     ),
@@ -242,13 +170,25 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  InputDecoration _dropdownDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: Colors.grey.shade100,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget currentPage;
     switch (_selectedIndex) {
       case 0: currentPage = _buildFeed(); break;
       case 1: currentPage = const WardrobePage(); break;
-      case 2: currentPage = const EditorPage(); break;
+      case 2:
+        // 🔥 Наше исправление: колбэк для возврата в профиль
+        currentPage = EditorPage(onFinish: () => _onBottomNavTap(4));
+        break;
       case 3: currentPage = const ChatPage(); break;
       case 4: currentPage = const ProfilePage(); break;
       default: currentPage = _buildFeed();
@@ -264,40 +204,35 @@ class _HomePageState extends State<HomePage> {
       child: Scaffold(
         backgroundColor: isFeed ? Colors.black : const Color(0xFFF5E6E8),
         body: currentPage,
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
+        
+        // 🔥 Скрываем меню только на вкладке Editor
+        bottomNavigationBar: _selectedIndex == 2 
+            ? null 
+            : Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -2))],
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+                ),
+                child: BottomNavigationBar(
+                  currentIndex: _selectedIndex,
+                  onTap: _onBottomNavTap,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  selectedItemColor: Colors.black87,
+                  unselectedItemColor: Colors.grey.shade600,
+                  selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  unselectedLabelStyle: const TextStyle(fontSize: 11),
+                  items: [
+                    _buildNavItem(Icons.local_fire_department_outlined, 'Feed', 0),
+                    _buildNavItem(Icons.checkroom_outlined, 'Wardrobe', 1),
+                    _buildNavItem(Icons.auto_fix_high_outlined, 'Editor', 2),
+                    _buildNavItem(Icons.auto_awesome_outlined, 'AI Stylist', 3),
+                    _buildNavItem(Icons.person_outline, 'Profile', 4),
+                  ],
+                ),
               ),
-            ],
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: BottomNavigationBar(
-            currentIndex: _selectedIndex,
-            onTap: _onBottomNavTap,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            selectedItemColor: Colors.black87,
-            unselectedItemColor: Colors.grey.shade600,
-            selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            unselectedLabelStyle: const TextStyle(fontSize: 11),
-            items: [
-              _buildNavItem(Icons.local_fire_department_outlined, 'Feed', 0),
-              _buildNavItem(Icons.checkroom_outlined, 'Wardrobe', 1),
-              _buildNavItem(Icons.auto_fix_high_outlined, 'Editor', 2),
-              _buildNavItem(Icons.auto_awesome_outlined, 'AI Stylist', 3),
-              _buildNavItem(Icons.person_outline, 'Profile', 4),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -322,14 +257,9 @@ class _HomePageState extends State<HomePage> {
     return Stack(
       children: [
         StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('posts')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+          stream: FirebaseFirestore.instance.collection('posts').orderBy('createdAt', descending: true).snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(child: Text('Ошибка: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
-            }
+            if (snapshot.hasError) return Center(child: Text('Ошибка: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
               return Center(
                 child: Column(
@@ -355,15 +285,9 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Icon(Icons.tune, size: 80, color: Colors.pink.shade300),
                     const SizedBox(height: 24),
-                    const Text(
-                      'Ничего не найдено',
-                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
+                    const Text('Ничего не найдено', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    Text(
-                      _hasActiveFeedFilters ? 'Смените или сбросьте фильтры' : 'Создайте первый пост ✨',
-                      style: TextStyle(color: Colors.grey.shade400),
-                    ),
+                    Text(_hasActiveFeedFilters ? 'Смените или сбросьте фильтры' : 'Создайте первый пост ✨', style: TextStyle(color: Colors.grey.shade400)),
                   ],
                 ),
               );
@@ -376,7 +300,6 @@ class _HomePageState extends State<HomePage> {
             );
           },
         ),
-
         _buildTopMenu(),
       ],
     );
@@ -384,18 +307,12 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildTopMenu() {
     return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
+      top: 0, left: 0, right: 0,
       child: SafeArea(
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.black.withOpacity(0.7), Colors.transparent],
-            ),
+            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.7), Colors.transparent]),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -404,10 +321,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(width: 20),
               _buildTopTab("Рекомендации", true),
               const SizedBox(width: 20),
-              IconButton(
-                icon: const Icon(Icons.tune, color: Colors.white, size: 26),
-                onPressed: _openFeedFilters,
-              ),
+              IconButton(icon: const Icon(Icons.tune, color: Colors.white, size: 26), onPressed: _openFeedFilters),
               const SizedBox(width: 8),
             ],
           ),
@@ -420,19 +334,10 @@ class _HomePageState extends State<HomePage> {
     return GestureDetector(
       onTap: () {
         if (!isActive) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Вкладка '$title' в разработке 🚧"), backgroundColor: Colors.black54),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Вкладка '$title' в разработке 🚧"), backgroundColor: Colors.black54));
         }
       },
-      child: Text(
-        title,
-        style: TextStyle(
-          color: isActive ? Colors.white : Colors.white.withOpacity(0.6),
-          fontSize: 16,
-          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
+      child: Text(title, style: TextStyle(color: isActive ? Colors.white : Colors.white.withOpacity(0.6), fontSize: 16, fontWeight: isActive ? FontWeight.bold : FontWeight.normal)),
     );
   }
 
@@ -457,30 +362,18 @@ class _HomePageState extends State<HomePage> {
 
         return Stack(
           children: [
-            // Фон поста
             (imageUrl != null && File(imageUrl).existsSync())
-                ? Image.file(
-                    File(imageUrl),
-                    width: double.infinity,
-                    height: double.infinity,
-                    fit: BoxFit.contain,
-                  )
+                ? Image.file(File(imageUrl), width: double.infinity, height: double.infinity, fit: BoxFit.contain)
                 : Container(color: Colors.grey.shade900),
 
-            // Градиенты
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.black.withOpacity(0.3), Colors.transparent, Colors.black.withOpacity(0.8)],
-                  ),
+                  gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.3), Colors.transparent, Colors.black.withOpacity(0.8)]),
                 ),
               ),
             ),
 
-            // Правая панель действий (По центру экрана, без кружков)
             Align(
               alignment: Alignment.centerRight,
               child: Padding(
@@ -488,104 +381,47 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Аватар (кружок оставляем только для фото)
-                    _buildSideAction(
-                      profileImagePath: profileImagePath,
-                      onTap: () {},
-                      size: 24, // Аватар чуть меньше
-                    ),
+                    _buildSideAction(profileImagePath: profileImagePath, onTap: () {}, size: 24),
                     const SizedBox(height: 20),
-                    
-                    // Лайк
                     GestureDetector(
                       onTap: () => _toggleLike(docId),
-                      child: _buildSideAction(
-                        icon: isLiked ? Icons.favorite : Icons.favorite_border,
-                        color: isLiked ? Colors.red : Colors.white,
-                        size: 32,
-                      ),
+                      child: _buildSideAction(icon: isLiked ? Icons.favorite : Icons.favorite_border, color: isLiked ? Colors.red : Colors.white, size: 32),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      likesCount.toString(),
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                    
+                    Text(likesCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 20),
-                    
-                    // Коммент
-                    _buildSideAction(
-                      icon: Icons.chat_bubble_outline,
-                      color: Colors.white,
-                      size: 32,
-                    ),
+                    _buildSideAction(icon: Icons.chat_bubble_outline, color: Colors.white, size: 32),
                     const SizedBox(height: 4),
-                    const Text(
-                      "0", // Заглушка для комментов
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-
+                    const Text("0", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 20),
+                    _buildSideAction(icon: Icons.bookmark_border, color: Colors.white, size: 32),
                     const SizedBox(height: 20),
                     
-                    // Сохранить (Save) - выше
-                    _buildSideAction(
-                      icon: Icons.bookmark_border,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Marketplace (M) - between bookmark and share
+                    // 🔥 Marketplace кнопка
                     MarketplaceSearchButton(
                       size: 44,
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => MarketplaceSearchScreen(
-                              imageUrl: imageUrl,
-                              imagePath: imageUrl,
-                              queryHint: caption.toString(),
-                            ),
-                          ),
+                          MaterialPageRoute(builder: (_) => MarketplaceSearchScreen(imageUrl: imageUrl, imagePath: imageUrl, queryHint: caption.toString())),
                         );
                       },
                     ),
                     
                     const SizedBox(height: 20),
-                    
-                    // Поделиться (Share) - ниже
-                    _buildSideAction(
-                      icon: Icons.ios_share,
-                      color: Colors.white,
-                      size: 32,
-                    ),
+                    _buildSideAction(icon: Icons.ios_share, color: Colors.white, size: 32),
                   ],
                 ),
               ),
             ),
 
-            // Нижняя информация (слева)
             Positioned(
-              left: 12,
-              right: 80,
-              bottom: 24,
+              left: 12, right: 80, bottom: 24,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Убрали кнопку Follow
-                  Text(
-                    "@$username",
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  if (caption.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                  ],
-                  if (timestamp != null) ...[
-                    const SizedBox(height: 8),
-                    Text(_formatTime(timestamp), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
-                  ],
+                  Text("@$username", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  if (caption.isNotEmpty) ...[const SizedBox(height: 8), Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14))],
+                  if (timestamp != null) ...[const SizedBox(height: 8), Text(_formatTime(timestamp), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12))],
                 ],
               ),
             ),
@@ -595,32 +431,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Обновленный виджет для иконок (без черного фона)
-  Widget _buildSideAction({
-    IconData? icon,
-    Color? color,
-    double size = 32,
-    VoidCallback? onTap,
-    String? profileImagePath,
-  }) {
-    // Если передан путь к фото профиля - рисуем кружок с фото
+  Widget _buildSideAction({IconData? icon, Color? color, double size = 32, VoidCallback? onTap, String? profileImagePath}) {
     if (profileImagePath != null && File(profileImagePath).existsSync()) {
-      return CircleAvatar(
-        backgroundImage: FileImage(File(profileImagePath)),
-        radius: size,
-        backgroundColor: Colors.grey.shade300,
-      );
+      return CircleAvatar(backgroundImage: FileImage(File(profileImagePath)), radius: size, backgroundColor: Colors.grey.shade300);
     }
-
-    // Иначе рисуем просто иконку без фона
-    return GestureDetector(
-      onTap: onTap,
-      child: Icon(
-        icon,
-        color: color ?? Colors.white,
-        size: size,
-      ),
-    );
+    return GestureDetector(onTap: onTap, child: Icon(icon, color: color ?? Colors.white, size: size));
   }
 
   String _formatTime(Timestamp timestamp) {

@@ -1,413 +1,274 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:stylee_app/screens/post_preview_page.dart';
 
 class EditorPage extends StatefulWidget {
-  const EditorPage({super.key});
+  final VoidCallback? onFinish;
+  
+  const EditorPage({super.key, this.onFinish});
 
   @override
   State<EditorPage> createState() => _EditorPageState();
 }
 
 class _EditorPageState extends State<EditorPage> {
-  final currentUser = FirebaseAuth.instance.currentUser!;
   final ImagePicker _picker = ImagePicker();
   String? _selectedImagePath;
-  final _captionController = TextEditingController();
-  bool _isUploading = false;
-
-  String? _selectedEvent;
-  String? _selectedWeather;
-  String? _selectedColor;
-
-  final List<String> _eventOptions = ['работа', 'вечеринка', 'прогулка'];
-  final List<String> _weatherOptions = ['жарко', 'прохладно', 'дождь'];
-  final List<String> _colorOptions = ['чёрный', 'белый', 'красный', 'синий', 'серый', 'голубой'];
+  String? _activeTool;
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
-    );
-
-    if (image != null && mounted) {
-      setState(() => _selectedImagePath = image.path);
-    }
-  }
-
-  Future<void> _publishPost() async {
-    if (_selectedImagePath == null || _selectedImagePath!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Выберите фото для публикации')),
-      );
-      return;
-    }
-
-    setState(() => _isUploading = true);
-
     try {
-      // Копируем фото в директорию приложения
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = 'post_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final savedPath = '${directory.path}/$fileName';
-      
-      final file = File(_selectedImagePath!);
-      if (file.existsSync()) {
-        await file.copy(savedPath);
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null && mounted) {
+        setState(() => _selectedImagePath = image.path);
       }
-
-      // Сохраняем пост в Firestore
-      await FirebaseFirestore.instance.collection('posts').add({
-        'userEmail': currentUser.email,
-        'imageUrl': savedPath,
-        'caption': _captionController.text.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-        'Likes': [],
-        'events': _selectedEvent != null ? [_selectedEvent] : [],
-        'weathers': _selectedWeather != null ? [_selectedWeather] : [],
-        'colors': _selectedColor != null ? [_selectedColor] : [],
-      });
-
-      if (mounted) {
-        setState(() {
-          _selectedImagePath = null;
-          _captionController.clear();
-          _selectedEvent = null;
-          _selectedWeather = null;
-          _selectedColor = null;
-          _isUploading = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Пост опубликован! ✨'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Возвращаемся на главную страницу (ленту)
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') return;
+      print('❌ Ошибка picker: $e');
     } catch (e) {
-      if (mounted) {
-        setState(() => _isUploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка публикации: $e')),
-        );
-      }
+      print('❌ Неожиданная ошибка: $e');
     }
   }
 
-  @override
-  void dispose() {
-    _captionController.dispose();
-    super.dispose();
+  void _toggleTool(String tool) {
+    setState(() {
+      _activeTool = _activeTool == tool ? null : tool;
+    });
+  }
+
+  void _goToPreview() {
+    if (_selectedImagePath == null) return;
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PostPreviewPage(
+          imagePath: _selectedImagePath!,
+          onFinish: widget.onFinish,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF5E6E8),
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black87),
-            onPressed: () => Navigator.pop(context),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5E6E8),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(
+            _selectedImagePath != null ? Icons.arrow_back : Icons.close,
+            color: Colors.black87,
           ),
-          title: const Text(
-            'Editor',
-            style: TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
+          onPressed: () => widget.onFinish?.call(),
+        ),
+        title: const Text(
+          'Editor',
+          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
+        actions: [
+          if (_selectedImagePath != null)
+            IconButton(
+              icon: const Icon(Icons.check, color: Color(0xFFE91E63), size: 28),
+              onPressed: _goToPreview,
             ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: _selectedImagePath == null 
+                ? _buildEmptyState()
+                : _buildEditor(),
           ),
-          centerTitle: true,
-          actions: [
-            if (_selectedImagePath != null)
-              TextButton(
-                onPressed: _isUploading ? null : _publishPost,
-                child: _isUploading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        'Опубликовать',
-                        style: TextStyle(
-                          color: Color(0xFFE91E63),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
+
+          if (_selectedImagePath != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildToolIcon(Icons.crop, 'Crop', 'crop'),
+                  _buildToolIcon(Icons.filter, 'Filters', 'filters'),
+                  _buildToolIcon(Icons.color_lens, 'Color', 'color'),
+                  _buildToolIcon(Icons.auto_fix_high, 'AI', 'ai'),
+                ],
+              ),
+            ),
+
+            if (_activeTool != null)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: _buildControls(),
               ),
           ],
-        ),
-        body: _selectedImagePath == null ? _buildEmptyState() : _buildEditor(),
+        ],
       ),
     );
   }
 
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.edit_outlined,
-              size: 80,
-              color: Colors.pink.shade300,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: Colors.pink.shade100,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Редактор образов',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+            child: const Icon(
+              Icons.add_photo_alternate_outlined,
+              size: 50,
+              color: Colors.pink,
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Выберите фото для редактирования\nи публикации',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Выберите фото',
+            style: TextStyle(fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _pickImage,
+            icon: const Icon(Icons.photo_library, color: Colors.white, size: 20),
+            label: const Text('Галерея', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE91E63),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: _pickImage,
-              icon: const Icon(Icons.photo_library),
-              label: const Text('Выбрать фото'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE91E63),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildEditor() {
-    return Column(
-      children: [
-        Expanded(
-          child: Stack(
-            children: [
-              // Фоновые искры
-              Positioned.fill(
-                child: CustomPaint(painter: _SparklesPainter()),
-              ),
-              // Изображение по центру
-              Center(
-                child: Container(
-                  width: 300,
-                  height: 400,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.file(
-                      File(_selectedImagePath!),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        width: 300,
+        height: 400,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.file(
+            File(_selectedImagePath!),
+            fit: BoxFit.cover,
           ),
         ),
-        // Поле для описания
-        Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
+      ),
+    );
+  }
+
+  Widget _buildToolIcon(IconData icon, String label, String toolKey) {
+    final isActive = _activeTool == toolKey;
+    return GestureDetector(
+      onTap: () => _toggleTool(toolKey),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: isActive ? const Color(0xFFE91E63) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(
+              icon,
+              color: isActive ? Colors.white : Colors.black87,
+              size: 24,
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Описание (необязательно)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _captionController,
-                maxLines: 3,
-                maxLength: 150,
-                decoration: InputDecoration(
-                  hintText: 'Добавьте описание к вашему образу...',
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Метаданные (для фильтрации ленты)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                value: _selectedEvent,
-                decoration: InputDecoration(
-                  labelText: 'Мероприятие',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                items: [null, ..._eventOptions]
-                    .map(
-                      (e) => DropdownMenuItem<String?>(
-                        value: e,
-                        child: Text(e ?? 'Не выбрано'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedEvent = v),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                value: _selectedWeather,
-                decoration: InputDecoration(
-                  labelText: 'Погода',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                items: [null, ..._weatherOptions]
-                    .map(
-                      (e) => DropdownMenuItem<String?>(
-                        value: e,
-                        child: Text(e ?? 'Не выбрано'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedWeather = v),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                value: _selectedColor,
-                decoration: InputDecoration(
-                  labelText: 'Цвет',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                items: [null, ..._colorOptions]
-                    .map(
-                      (e) => DropdownMenuItem<String?>(
-                        value: e,
-                        child: Text(e ?? 'Не выбрано'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedColor = v),
-              ),
-            ],
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: isActive ? const Color(0xFFE91E63) : Colors.black54,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControls() {
+    switch (_activeTool) {
+      case 'color':
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildSlider('Brightness', 0.0, -1.0, 1.0),
+            const SizedBox(height: 16),
+            _buildSlider('Contrast', 1.0, 0.5, 2.0),
+          ],
+        );
+      case 'filters':
+        return const Center(child: Text('🎨 Фильтры (в разработке)', style: TextStyle(color: Colors.black54)));
+      case 'crop':
+        return const Center(child: Text('✂️ Обрезка (в разработке)', style: TextStyle(color: Colors.black54)));
+      case 'ai':
+        return const Center(child: Text('✨ AI (в разработке)', style: TextStyle(color: Colors.black54)));
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildSlider(String label, double value, double min, double max) {
+    return Row(
+      children: [
+        SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
+        Expanded(
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            activeColor: const Color(0xFFE91E63),
+            inactiveColor: Colors.pink.shade100,
+            onChanged: (v) {},
           ),
         ),
       ],
     );
   }
-}
-
-class _SparklesPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.6)
-      ..style = PaintingStyle.fill;
-
-    final random = [
-      Offset(size.width * 0.8, size.height * 0.1),
-      Offset(size.width * 0.15, size.height * 0.3),
-      Offset(size.width * 0.9, size.height * 0.5),
-      Offset(size.width * 0.1, size.height * 0.7),
-      Offset(size.width * 0.85, size.height * 0.8),
-    ];
-
-    for (final offset in random) {
-      canvas.save();
-      canvas.translate(offset.dx, offset.dy);
-      canvas.drawPath(_createStar(8), paint);
-      canvas.restore();
-    }
-  }
-
-  Path _createStar(double size) {
-    final path = Path();
-    path.moveTo(0, -size);
-    path.lineTo(size * 0.2, -size * 0.2);
-    path.lineTo(size, 0);
-    path.lineTo(size * 0.2, size * 0.2);
-    path.lineTo(0, size);
-    path.lineTo(-size * 0.2, size * 0.2);
-    path.lineTo(-size, 0);
-    path.lineTo(-size * 0.2, -size * 0.2);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
