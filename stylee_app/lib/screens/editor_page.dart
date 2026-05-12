@@ -20,6 +20,14 @@ class _EditorPageState extends State<EditorPage> {
   final _captionController = TextEditingController();
   bool _isUploading = false;
 
+  String? _selectedEvent;
+  String? _selectedWeather;
+  String? _selectedColor;
+
+  final List<String> _eventOptions = ['работа', 'вечеринка', 'прогулка'];
+  final List<String> _weatherOptions = ['жарко', 'прохладно', 'дождь'];
+  final List<String> _colorOptions = ['чёрный', 'белый', 'красный', 'синий', 'серый', 'голубой'];
+
   Future<void> _pickImage() async {
     final XFile? image = await _picker.pickImage(
       source: ImageSource.gallery,
@@ -61,12 +69,18 @@ class _EditorPageState extends State<EditorPage> {
         'caption': _captionController.text.trim(),
         'createdAt': FieldValue.serverTimestamp(),
         'Likes': [],
+        'events': _selectedEvent != null ? [_selectedEvent] : [],
+        'weathers': _selectedWeather != null ? [_selectedWeather] : [],
+        'colors': _selectedColor != null ? [_selectedColor] : [],
       });
 
       if (mounted) {
         setState(() {
           _selectedImagePath = null;
           _captionController.clear();
+          _selectedEvent = null;
+          _selectedWeather = null;
+          _selectedColor = null;
           _isUploading = false;
         });
 
@@ -273,6 +287,81 @@ class _EditorPageState extends State<EditorPage> {
                   border: InputBorder.none,
                   hintStyle: TextStyle(color: Colors.grey.shade400),
                 ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Метаданные (для фильтрации ленты)',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                value: _selectedEvent,
+                decoration: InputDecoration(
+                  labelText: 'Мероприятие',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: [null, ..._eventOptions]
+                    .map(
+                      (e) => DropdownMenuItem<String?>(
+                        value: e,
+                        child: Text(e ?? 'Не выбрано'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedEvent = v),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                value: _selectedWeather,
+                decoration: InputDecoration(
+                  labelText: 'Погода',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: [null, ..._weatherOptions]
+                    .map(
+                      (e) => DropdownMenuItem<String?>(
+                        value: e,
+                        child: Text(e ?? 'Не выбрано'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedWeather = v),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String?>(
+                value: _selectedColor,
+                decoration: InputDecoration(
+                  labelText: 'Цвет',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: [null, ..._colorOptions]
+                    .map(
+                      (e) => DropdownMenuItem<String?>(
+                        value: e,
+                        child: Text(e ?? 'Не выбрано'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedColor = v),
               ),
             ],
           ),

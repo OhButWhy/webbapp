@@ -21,6 +21,14 @@ class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   final currentUser = FirebaseAuth.instance.currentUser!;
 
+  String? _feedEventFilter;
+  String? _feedWeatherFilter;
+  String? _feedColorFilter;
+
+  final List<String> _eventOptions = ['работа', 'вечеринка', 'прогулка'];
+  final List<String> _weatherOptions = ['жарко', 'прохладно', 'дождь'];
+  final List<String> _colorOptions = ['чёрный', 'белый', 'красный', 'синий', 'серый', 'голубой'];
+
   // Кэш для данных пользователей
   final Map<String, Map<String, dynamic>> _usersCache = {};
 
@@ -67,6 +75,169 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error toggling like in feed: $e');
     }
+  }
+
+  bool get _hasActiveFeedFilters =>
+      _feedEventFilter != null || _feedWeatherFilter != null || _feedColorFilter != null;
+
+  bool _postMatchesFeedFilters(QueryDocumentSnapshot post) {
+    if (!_hasActiveFeedFilters) return true;
+    final data = post.data() as Map<String, dynamic>;
+
+    final events = (data['events'] is List)
+      ? (data['events'] as List).whereType<String>().toList()
+      : const <String>[];
+    final weathers = (data['weathers'] is List)
+      ? (data['weathers'] as List).whereType<String>().toList()
+      : const <String>[];
+    final colors = (data['colors'] is List)
+      ? (data['colors'] as List).whereType<String>().toList()
+      : const <String>[];
+
+    final matchesEvent = _feedEventFilter == null || events.contains(_feedEventFilter);
+    final matchesWeather = _feedWeatherFilter == null || weathers.contains(_feedWeatherFilter);
+    final matchesColor = _feedColorFilter == null || colors.contains(_feedColorFilter);
+
+    return matchesEvent && matchesWeather && matchesColor;
+  }
+
+  Future<void> _openFeedFilters() async {
+    String? selectedEvent = _feedEventFilter;
+    String? selectedWeather = _feedWeatherFilter;
+    String? selectedColor = _feedColorFilter;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: StatefulBuilder(
+          builder: (context, setModalState) => Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Фильтры ленты',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String?>(
+                  value: selectedEvent,
+                  decoration: InputDecoration(
+                    labelText: 'Мероприятие',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: [null, ..._eventOptions]
+                      .map(
+                        (e) => DropdownMenuItem<String?>(
+                          value: e,
+                          child: Text(e ?? 'Не выбрано'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setModalState(() => selectedEvent = v),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String?>(
+                  value: selectedWeather,
+                  decoration: InputDecoration(
+                    labelText: 'Погода',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: [null, ..._weatherOptions]
+                      .map(
+                        (e) => DropdownMenuItem<String?>(
+                          value: e,
+                          child: Text(e ?? 'Не выбрано'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setModalState(() => selectedWeather = v),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String?>(
+                  value: selectedColor,
+                  decoration: InputDecoration(
+                    labelText: 'Цвет',
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: [null, ..._colorOptions]
+                      .map(
+                        (e) => DropdownMenuItem<String?>(
+                          value: e,
+                          child: Text(e ?? 'Не выбрано'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setModalState(() => selectedColor = v),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          setState(() {
+                            _feedEventFilter = null;
+                            _feedWeatherFilter = null;
+                            _feedColorFilter = null;
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Сбросить'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _feedEventFilter = selectedEvent;
+                            _feedWeatherFilter = selectedWeather;
+                            _feedColorFilter = selectedColor;
+                          });
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE91E63),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Применить'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -172,7 +343,30 @@ class _HomePageState extends State<HomePage> {
               );
             }
 
-            final posts = snapshot.data!.docs;
+            final allPosts = snapshot.data!.docs;
+            final posts = allPosts.where(_postMatchesFeedFilters).toList();
+
+            if (posts.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.tune, size: 80, color: Colors.pink.shade300),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Ничего не найдено',
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _hasActiveFeedFilters ? 'Смените или сбросьте фильтры' : 'Создайте первый пост ✨',
+                      style: TextStyle(color: Colors.grey.shade400),
+                    ),
+                  ],
+                ),
+              );
+            }
+
             return PageView.builder(
               scrollDirection: Axis.vertical,
               itemCount: posts.length,
@@ -209,12 +403,8 @@ class _HomePageState extends State<HomePage> {
               _buildTopTab("Рекомендации", true),
               const SizedBox(width: 20),
               IconButton(
-                icon: const Icon(Icons.search, color: Colors.white, size: 26),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Поиск в разработке 🔍"), backgroundColor: Colors.black54),
-                  );
-                },
+                icon: const Icon(Icons.tune, color: Colors.white, size: 26),
+                onPressed: _openFeedFilters,
               ),
               const SizedBox(width: 8),
             ],
