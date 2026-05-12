@@ -23,7 +23,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
   final currentUser = FirebaseAuth.instance.currentUser!;
   String? _profileImagePath;
   
-  // Храним состояние лайков для каждого поста
   Map<String, bool> _likesState = {};
   Map<String, int> _likesCount = {};
 
@@ -75,14 +74,12 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final isCurrentlyLiked = _likesState[docId] ?? false;
     final currentCount = _likesCount[docId] ?? 0;
     
-    // Сразу обновляем UI
     setState(() {
       _likesState[docId] = !isCurrentlyLiked;
       _likesCount[docId] = isCurrentlyLiked ? currentCount - 1 : currentCount + 1;
     });
 
     try {
-      // Обновляем в Firestore
       final postRef = FirebaseFirestore.instance.collection('posts').doc(docId);
       
       if (isCurrentlyLiked) {
@@ -96,7 +93,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
       }
     } catch (e) {
       print('Error toggling like: $e');
-      // Откат изменений при ошибке
       if (mounted) {
         setState(() {
           _likesState[docId] = isCurrentlyLiked;
@@ -111,7 +107,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
     final docId = post['docId'] as String?;
     if (docId == null) return;
 
-    // Подтверждение удаления
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -134,22 +129,18 @@ class _PostDetailPageState extends State<PostDetailPage> {
     if (confirm != true) return;
 
     try {
-      // Удаляем из Firestore
       await FirebaseFirestore.instance.collection('posts').doc(docId).delete();
 
-      // Удаляем локальный файл изображения (если есть)
       final imageUrl = post['imageUrl'] as String?;
       if (imageUrl != null && File(imageUrl).existsSync()) {
         await File(imageUrl).delete();
       }
 
-      // Удаляем пост из списка и возвращаемся назад, если это был последний пост
       if (mounted) {
         setState(() {
           widget.posts.removeAt(index);
         });
 
-        // Если удалили последний пост — закрываем экран
         if (widget.posts.isEmpty) {
           Navigator.pop(context);
         } else {
@@ -189,7 +180,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
               title: const Text('Редактировать'),
               onTap: () {
                 Navigator.pop(context);
-                // Заглушка — можно добавить позже
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Редактирование пока недоступно')),
                 );
@@ -210,19 +200,17 @@ class _PostDetailPageState extends State<PostDetailPage> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    const months = [
-      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
-    ];
-    
-    final day = date.day;
-    final month = months[date.month - 1];
-    final year = date.year;
-    final hour = date.hour.toString().padLeft(2, '0');
-    final minute = date.minute.toString().padLeft(2, '0');
-    
-    return '$day $month $year, $hour:$minute';
+  // ТОЧНО ТАКАЯ ЖЕ ФУНКЦИЯ КАК В HOME_PAGE
+  String _formatTime(Timestamp timestamp) {
+    final now = DateTime.now();
+    final postDate = timestamp.toDate();
+    final diff = now.difference(postDate);
+
+    if (diff.inMinutes < 1) return 'только что';
+    if (diff.inHours < 1) return '${diff.inMinutes} мин. назад';
+    if (diff.inDays < 1) return '${diff.inHours} ч. назад';
+    if (diff.inDays < 7) return '${diff.inDays} дн. назад';
+    return '${postDate.day}.${postDate.month}.${postDate.year}';
   }
 
   @override
@@ -251,18 +239,14 @@ class _PostDetailPageState extends State<PostDetailPage> {
               
               final imageUrl = post['imageUrl'] as String?;
               final caption = post['caption'] as String?;
-              final timestamp = post['createdAt'];
+              final timestamp = post['createdAt']; // ТОЧНО КАК В HOME_PAGE
               final likesCount = _likesCount[docId] ?? 0;
               final isLiked = _likesState[docId] ?? false;
-              
-              final createdAt = timestamp != null 
-                  ? (timestamp is Timestamp ? timestamp.toDate() : null)
-                  : null;
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. Шапка поста: Аватар + Ник + Меню
+                  // 1. Шапка поста
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Row(
@@ -276,7 +260,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                               : null,
                           child: (profileImagePath == null || 
                                   !File(profileImagePath).existsSync())
-                              ? Icon(Icons.person, size: 18, color: Colors.grey.shade400)
+                              ? const Icon(Icons.person, size: 18, color: Colors.grey)
                               : null,
                         ),
                         const SizedBox(width: 10),
@@ -288,7 +272,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           ),
                         ),
                         const Spacer(),
-                        // Три точки → открывают меню
                         IconButton(
                           icon: const Icon(Icons.more_vert, size: 20, color: Colors.black87),
                           onPressed: () => _showPostOptions(index),
@@ -297,7 +280,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                     ),
                   ),
 
-                  // 2. Изображение (Квадратное)
+                  // 2. Изображение
                   AspectRatio(
                     aspectRatio: 1,
                     child: imageUrl != null && imageUrl.isNotEmpty && File(imageUrl).existsSync()
@@ -312,12 +295,11 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           ),
                   ),
 
-                  // 3. Кнопки действий (Лайк + Коммент) + Счётчик лайков
+                  // 3. Кнопки действий
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     child: Row(
                       children: [
-                        // Кнопка лайка
                         IconButton(
                           icon: Icon(
                             isLiked ? Icons.favorite : Icons.favorite_border,
@@ -331,12 +313,11 @@ class _PostDetailPageState extends State<PostDetailPage> {
                           onPressed: () {},
                           color: Colors.black87,
                         ),
-                        const Spacer(),
                       ],
                     ),
                   ),
 
-                  // Количество лайков
+                  // 4. Количество лайков
                   if (likesCount > 0)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -350,7 +331,7 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       ),
                     ),
 
-                  // 4. Описание (если есть)
+                  // 5. Описание
                   if (caption != null && caption.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -372,22 +353,23 @@ class _PostDetailPageState extends State<PostDetailPage> {
                       ),
                     ),
 
-                  // 5. Дата (мелким серым шрифтом)
-                  if (createdAt != null)
+                  // 6. ДАТА (ТОЧНО КАК В HOME_PAGE - ЧЁРНЫМ ЦВЕТОМ)
+                  if (timestamp != null) ...[
+                    const SizedBox(height: 4),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        _formatDate(createdAt),
+                        _formatTime(timestamp),
                         style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
+                          fontSize: 12,
+                          color: Colors.black87, // ЧЁРНЫЙ ЦВЕТ
                         ),
                       ),
                     ),
+                  ],
 
                   const SizedBox(height: 8),
 
-                  // Тонкая и более темная разделительная линия
                   Divider(color: Colors.grey.shade400, height: 1, thickness: 0.5),
                 ],
               );
@@ -399,13 +381,12 @@ class _PostDetailPageState extends State<PostDetailPage> {
   }
 }
 
-// Класс Timestamp для совместимости с Firestore
-class Timestamp {
-  final DateTime _dateTime;
+// class Timestamp {
+//   final DateTime _dateTime;
 
-  Timestamp(this._dateTime);
+//   Timestamp(this._dateTime);
 
-  DateTime toDate() => _dateTime;
+//   DateTime toDate() => _dateTime;
 
-  factory Timestamp.fromDate(DateTime date) => Timestamp(date);
-}
+//   factory Timestamp.fromDate(DateTime date) => Timestamp(date);
+// }

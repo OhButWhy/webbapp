@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +9,6 @@ import 'package:stylee_app/screens/editor_page.dart';
 import 'package:stylee_app/screens/edit_profile_page.dart';
 import 'package:stylee_app/screens/profile_page.dart';
 import 'package:stylee_app/screens/wardrobe_page.dart';
-import 'dart:io';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,154 +19,86 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-
   final currentUser = FirebaseAuth.instance.currentUser!;
-  final textController = TextEditingController();
 
-  void signOut() {
-    FirebaseAuth.instance.signOut();
-  }
-
-  void postMessage() {
-    if (textController.text.isNotEmpty) {
-      FirebaseFirestore.instance.collection("User Posts").add({
-        'UserEmail': currentUser.email,
-        'Message': textController.text,
-        'TimeStamp': Timestamp.now(),
-        'Likes': [],
-      });
-
-      setState(() {
-        textController.clear();
-      });
-    }
-  }
-
-  void goToProfilePage() {
-    Navigator.pop(context);
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ProfilePage()),
-    );
-  }
+  // Кэш для данных пользователей
+  final Map<String, Map<String, dynamic>> _usersCache = {};
 
   void _onBottomNavTap(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
-  void _showProfileMenu(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Настройки'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Выйти', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  signOut();
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-          ],
-        );
-      },
-    );
+  Future<Map<String, dynamic>> _getUserData(String email) async {
+    if (_usersCache.containsKey(email)) {
+      return _usersCache[email]!;
+    }
+    try {
+      final doc = await FirebaseFirestore.instance.collection('Users').doc(email).get();
+      if (doc.exists && doc.data() != null) {
+        _usersCache[email] = doc.data()!;
+        return doc.data()!;
+      }
+    } catch (e) {
+      print('Error getting user  $e');
+    }
+    return {'username': email.split('@').first, 'profileImagePath': null};
+  }
+
+  // Функция переключения лайка
+  Future<void> _toggleLike(String docId) async {
+    try {
+      final postRef = FirebaseFirestore.instance.collection('posts').doc(docId);
+      final postSnap = await postRef.get();
+      
+      if (!postSnap.exists) return;
+      
+      final likesList = postSnap.data()?['Likes'] as List<dynamic>? ?? [];
+      final isCurrentlyLiked = likesList.contains(currentUser.email);
+
+      if (isCurrentlyLiked) {
+        await postRef.update({
+          'Likes': FieldValue.arrayRemove([currentUser.email]),
+        });
+      } else {
+        await postRef.update({
+          'Likes': FieldValue.arrayUnion([currentUser.email]),
+        });
+      }
+    } catch (e) {
+      print('Error toggling like in feed: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     Widget currentPage;
     switch (_selectedIndex) {
-      case 0:
-        currentPage = _buildWallFeed();
-        break;
-      case 1:
-        currentPage = const WardrobePage();
-        break;
-      case 2:
-        currentPage = const EditorPage();
-        break;
-      case 3:
-        currentPage = const ChatPage();
-        break;
-      case 4:
-        currentPage = const ProfilePage();
-        break;
-      default:
-        currentPage = _buildWallFeed();
+      case 0: currentPage = _buildFeed(); break;
+      case 1: currentPage = const WardrobePage(); break;
+      case 2: currentPage = const EditorPage(); break;
+      case 3: currentPage = const ChatPage(); break;
+      case 4: currentPage = const ProfilePage(); break;
+      default: currentPage = _buildFeed();
     }
 
-    final isProfile = _selectedIndex == 4;
+    final isFeed = _selectedIndex == 0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
+        statusBarIconBrightness: isFeed ? Brightness.light : Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5E6E8),
-        extendBodyBehindAppBar: isProfile,
-        appBar: isProfile
-            ? AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                leading: TextButton(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const EditProfilePage()),
-                    );
-                    if (result == true && mounted) {
-                      setState(() {});
-                    }
-                  },
-                  child: Text(
-                    'Edit',
-                    style: TextStyle(color: Colors.black87),
-                  ),
-                ),
-                title: Text(
-                  'Stylee',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-                centerTitle: true,
-                actions: [
-                  IconButton(
-                    icon: Icon(Icons.menu, color: Colors.black87),
-                    onPressed: () => _showProfileMenu(context),
-                  ),
-                ],
-              )
-            : null,
-        drawer: _selectedIndex == 0
-            ? MyDrawer(onProfileTap: goToProfilePage, onSignOut: signOut)
-            : null,
+        backgroundColor: isFeed ? Colors.black : const Color(0xFFF5E6E8),
         body: currentPage,
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 15,
-                offset: const Offset(0, -5),
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
               ),
             ],
             borderRadius: const BorderRadius.only(
@@ -182,7 +114,7 @@ class _HomePageState extends State<HomePage> {
             elevation: 0,
             selectedItemColor: Colors.black87,
             unselectedItemColor: Colors.grey.shade600,
-            selectedLabelStyle: const TextStyle(fontSize: 11),
+            selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
             unselectedLabelStyle: const TextStyle(fontSize: 11),
             items: [
               _buildNavItem(Icons.local_fire_department_outlined, 'Feed', 0),
@@ -197,427 +129,291 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  BottomNavigationBarItem _buildNavItem(
-    IconData icon,
-    String label,
-    int index,
-  ) {
+  BottomNavigationBarItem _buildNavItem(IconData icon, String label, int index) {
     final isSelected = _selectedIndex == index;
     return BottomNavigationBarItem(
-      icon: Stack(
-        alignment: Alignment.center,
+      icon: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (isSelected)
-            Container(
-              width: 55,
-              height: 55,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFFE91E63).withValues(alpha: 0.25),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? const Color(0xFFE91E63) : const Color(0xFF666666),
-                size: 28,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: isSelected ? const Color(0xFFE91E63) : const Color(0xFF666666),
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
+          Icon(icon, color: isSelected ? const Color(0xFFE91E63) : const Color(0xFF666666), size: 26),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(color: isSelected ? const Color(0xFFE91E63) : const Color(0xFF666666))),
         ],
       ),
       label: '',
     );
   }
 
-  Widget _buildWallFeed() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection("posts")
-          .orderBy("createdAt", descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('Ошибка: ${snapshot.error}'));
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.local_fire_department_outlined,
-                  size: 80,
-                  color: Colors.pink.shade300,
+  // ================= TIKTOK-STYLE FEED =================
+  Widget _buildFeed() {
+    return Stack(
+      children: [
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('posts')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(child: Text('Ошибка: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.local_fire_department_outlined, size: 80, color: Colors.pink.shade300),
+                    const SizedBox(height: 24),
+                    const Text('Лента пуста', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Text('Создайте первый пост ✨', style: TextStyle(color: Colors.grey.shade400)),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'Лента пуста',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Подпишитесь на стилистов\nили создайте первый пост',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+              );
+            }
 
-        final posts = snapshot.data!.docs;
-
-        return PageView.builder(
-          scrollDirection: Axis.vertical,
-          itemCount: posts.length,
-          itemBuilder: (context, index) {
-            final post = posts[index];
-            return _TikTokStylePostFromFirestore(
-              post: post,
-              currentIndex: index,
-              totalPosts: posts.length,
+            final posts = snapshot.data!.docs;
+            return PageView.builder(
+              scrollDirection: Axis.vertical,
+              itemCount: posts.length,
+              itemBuilder: (context, index) => _buildPostItem(posts[index]),
             );
           },
-        );
-      },
+        ),
+
+        _buildTopMenu(),
+      ],
     );
   }
-}
 
-// ============================================================================
-// ВИДЖЕТ ПОСТА ИЗ FIRESTORE (замена старому _TikTokStylePost)
-// ============================================================================
-class _TikTokStylePostFromFirestore extends StatefulWidget {
-  final QueryDocumentSnapshot post;
-  final int currentIndex;
-  final int totalPosts;
-
-  const _TikTokStylePostFromFirestore({
-    required this.post,
-    required this.currentIndex,
-    required this.totalPosts,
-  });
-
-  @override
-  State<_TikTokStylePostFromFirestore> createState() => _TikTokStylePostFromFirestoreState();
-}
-
-class _TikTokStylePostFromFirestoreState extends State<_TikTokStylePostFromFirestore> {
-  final currentUser = FirebaseAuth.instance.currentUser!;
-  bool isLiked = false;
-  late List<String> likes;
-
-  @override
-  void initState() {
-    super.initState();
-    likes = List<String>.from(widget.post['Likes'] ?? []);
-    isLiked = likes.contains(currentUser.email);
+  Widget _buildTopMenu() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildTopTab("Подписки", false),
+              const SizedBox(width: 20),
+              _buildTopTab("Рекомендации", true),
+              const SizedBox(width: 20),
+              IconButton(
+                icon: const Icon(Icons.search, color: Colors.white, size: 26),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Поиск в разработке 🔍"), backgroundColor: Colors.black54),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  void toggleLike() {
-    setState(() {
-      isLiked = !isLiked;
-      if (isLiked) {
-        likes.add(currentUser.email!);
-      } else {
-        likes.remove(currentUser.email);
-      }
-    });
-
-    DocumentReference postRef = FirebaseFirestore.instance
-        .collection("posts")
-        .doc(widget.post.id);
-
-    postRef.update({
-      'Likes': isLiked
-          ? FieldValue.arrayUnion([currentUser.email])
-          : FieldValue.arrayRemove([currentUser.email]),
-    });
+  Widget _buildTopTab(String title, bool isActive) {
+    return GestureDetector(
+      onTap: () {
+        if (!isActive) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Вкладка '$title' в разработке 🚧"), backgroundColor: Colors.black54),
+          );
+        }
+      },
+      child: Text(
+        title,
+        style: TextStyle(
+          color: isActive ? Colors.white : Colors.white.withOpacity(0.6),
+          fontSize: 16,
+          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final userEmail = widget.post['userEmail'] ?? 'Anonymous';
-    final caption = widget.post['caption'] ?? '';
-    final imageUrl = widget.post['imageUrl'] as String?;
-    final timestamp = widget.post['createdAt'] as Timestamp?;
+  Widget _buildPostItem(QueryDocumentSnapshot post) {
+    final data = post.data() as Map<String, dynamic>;
+    final imageUrl = data['imageUrl'] as String?;
+    final caption = data['caption'] ?? '';
+    final timestamp = data['createdAt'] as Timestamp?;
+    final authorEmail = data['userEmail'] as String? ?? '';
+    final docId = post.id;
     
-    return Container(
-      color: Colors.black,
-      child: Stack(
-        children: [
-          // Изображение из поста (локальный файл)
-          imageUrl != null && imageUrl.isNotEmpty && File(imageUrl).existsSync()
-              ? Image.file(
-                  File(imageUrl),
-                  width: double.infinity,
-                  height: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey.shade800,
-                      child: const Center(
-                        child: Icon(Icons.image_not_supported, color: Colors.grey, size: 50),
-                      ),
-                    );
-                  },
-                )
-              : Container(
-                  color: Colors.grey.shade800,
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.image, color: Colors.grey, size: 50),
-                        SizedBox(height: 8),
-                        Text('Нет фото', style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
+    final likesList = data['Likes'] as List<dynamic>? ?? [];
+    final isLiked = likesList.contains(currentUser.email);
+    final likesCount = likesList.length;
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _getUserData(authorEmail),
+      builder: (context, snapshot) {
+        final userData = snapshot.data ?? {};
+        final username = userData['username'] as String? ?? authorEmail.split('@').first;
+        final profileImagePath = userData['profileImagePath'] as String?;
+
+        return Stack(
+          children: [
+            // Фон поста
+            (imageUrl != null && File(imageUrl).existsSync())
+                ? Image.file(
+                    File(imageUrl),
+                    width: double.infinity,
+                    height: double.infinity,
+                    fit: BoxFit.contain,
+                  )
+                : Container(color: Colors.grey.shade900),
+
+            // Градиенты
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black.withOpacity(0.3), Colors.transparent, Colors.black.withOpacity(0.8)],
                   ),
                 ),
-          
-          // Градиент снизу для читаемости текста
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: 250,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.7),
-                    Colors.transparent,
+              ),
+            ),
+
+            // Правая панель действий (По центру экрана, без кружков)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Аватар (кружок оставляем только для фото)
+                    _buildSideAction(
+                      profileImagePath: profileImagePath,
+                      onTap: () {},
+                      size: 24, // Аватар чуть меньше
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Лайк
+                    GestureDetector(
+                      onTap: () => _toggleLike(docId),
+                      child: _buildSideAction(
+                        icon: isLiked ? Icons.favorite : Icons.favorite_border,
+                        color: isLiked ? Colors.red : Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      likesCount.toString(),
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Коммент
+                    _buildSideAction(
+                      icon: Icons.chat_bubble_outline,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      "0", // Заглушка для комментов
+                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+
+                    const SizedBox(height: 20),
+                    
+                    // Сохранить (Save) - выше
+                    _buildSideAction(
+                      icon: Icons.bookmark_border,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Поделиться (Share) - ниже
+                    _buildSideAction(
+                      icon: Icons.ios_share,
+                      color: Colors.white,
+                      size: 32,
+                    ),
                   ],
                 ),
               ),
             ),
-          ),
-          
-          // Боковая панель справа (как в TikTok)
-          Positioned(
-            right: 12,
-            bottom: 120,
-            child: _buildSideActions(),
-          ),
-          
-          // Информация о посте снизу
-          Positioned(
-            left: 16,
-            right: 80,
-            bottom: 24,
-            child: _buildPostInfo(userEmail, caption, timestamp),
-          ),
-          
-          // Счётчик постов сверху
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${widget.currentIndex + 1}/${widget.totalPosts}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSideActions() {
-    return Column(
-      children: [
-        // Аватар пользователя
-        _buildUserAvatar(),
-        const SizedBox(height: 20),
-        
-        // Лайк
-        _buildActionButton(
-          icon: isLiked ? Icons.favorite : Icons.favorite_border,
-          color: isLiked ? Colors.red : Colors.white,
-          label: '${likes.length}',
-          onTap: toggleLike,
-        ),
-        const SizedBox(height: 16),
-        
-        // Комментарии
-        _buildActionButton(
-          icon: Icons.chat_bubble_outline,
-          color: Colors.white,
-          label: '0',
-          onTap: () {},
-        ),
-        const SizedBox(height: 16),
-        
-        // Поделиться
-        _buildActionButton(
-          icon: Icons.share_outlined,
-          color: Colors.white,
-          label: 'Share',
-          onTap: () {},
-        ),
-        const SizedBox(height: 16),
-        
-        // Сохранить
-        _buildActionButton(
-          icon: Icons.bookmark_border,
-          color: Colors.white,
-          label: 'Save',
-          onTap: () {},
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUserAvatar() {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
-      ),
-      child: ClipOval(
-        child: Container(
-          color: Colors.grey.shade400,
-          child: const Icon(Icons.person, color: Colors.white, size: 28),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.black.withValues(alpha: 0.3),
-            ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPostInfo(String userEmail, String caption, Timestamp? timestamp) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Имя пользователя
-        Row(
-          children: [
-            Text(
-              '@${userEmail.split('@').first}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE91E63),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Text(
-                'Follow',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
+            // Нижняя информация (слева)
+            Positioned(
+              left: 12,
+              right: 80,
+              bottom: 24,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Убрали кнопку Follow
+                  Text(
+                    "@$username",
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  if (caption.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                  ],
+                  if (timestamp != null) ...[
+                    const SizedBox(height: 8),
+                    Text(_formatTime(timestamp), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
+                  ],
+                ],
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-        
-        // Описание поста
-        if (caption.isNotEmpty)
-          Text(
-            caption,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        const SizedBox(height: 12),
-        
-        // Время
-        if (timestamp != null)
-          Text(
-            _formatTimestamp(timestamp),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 12,
-            ),
-          ),
-      ],
+        );
+      },
     );
   }
 
-  String _formatTimestamp(Timestamp timestamp) {
+  // Обновленный виджет для иконок (без черного фона)
+  Widget _buildSideAction({
+    IconData? icon,
+    Color? color,
+    double size = 32,
+    VoidCallback? onTap,
+    String? profileImagePath,
+  }) {
+    // Если передан путь к фото профиля - рисуем кружок с фото
+    if (profileImagePath != null && File(profileImagePath).existsSync()) {
+      return CircleAvatar(
+        backgroundImage: FileImage(File(profileImagePath)),
+        radius: size,
+        backgroundColor: Colors.grey.shade300,
+      );
+    }
+
+    // Иначе рисуем просто иконку без фона
+    return GestureDetector(
+      onTap: onTap,
+      child: Icon(
+        icon,
+        color: color ?? Colors.white,
+        size: size,
+      ),
+    );
+  }
+
+  String _formatTime(Timestamp timestamp) {
     final now = DateTime.now();
     final postDate = timestamp.toDate();
     final diff = now.difference(postDate);
@@ -626,7 +422,6 @@ class _TikTokStylePostFromFirestoreState extends State<_TikTokStylePostFromFires
     if (diff.inHours < 1) return '${diff.inMinutes} мин. назад';
     if (diff.inDays < 1) return '${diff.inHours} ч. назад';
     if (diff.inDays < 7) return '${diff.inDays} дн. назад';
-    
     return '${postDate.day}.${postDate.month}.${postDate.year}';
   }
 }
