@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import base64
 import json
 import os
 import sqlite3
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from contextlib import asynccontextmanager
@@ -88,6 +88,12 @@ class AiChatPayload(BaseModel):
     imageBase64: Optional[str] = None
     imageMimeType: Optional[str] = None
     imagePath: Optional[str] = None
+
+
+class MarketplaceSearchPayload(BaseModel):
+    imageUrl: Optional[str] = None
+    imagePath: Optional[str] = None
+    query: Optional[str] = None
 
 
 @asynccontextmanager
@@ -345,9 +351,100 @@ def call_openrouter(system_prompt: str, user_message: str, image_base64: Optiona
         raise HTTPException(status_code=502, detail="Unexpected OpenRouter response shape") from error
 
 
+def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
+    encoded = urllib.parse.quote_plus(seed_query or "стильная одежда")
+    return [
+        {
+            "title": "Платье миди, базовое",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}"
+            ),
+        },
+        {
+            "title": "Блейзер прямого кроя",
+            "marketplace": "Ozon",
+            "url": f"https://www.ozon.ru/search/?text={encoded}",
+        },
+        {
+            "title": "Джинсы wide-leg",
+            "marketplace": "Lamoda",
+            "url": f"https://www.lamoda.ru/catalogsearch/result/?q={encoded}",
+        },
+        {
+            "title": "Рубашка oversize",
+            "marketplace": "Яндекс Маркет",
+            "url": f"https://market.yandex.ru/search?text={encoded}",
+        },
+        {
+            "title": "Тренч классический",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+тренч"
+            ),
+        },
+        {
+            "title": "Юбка плиссе",
+            "marketplace": "Ozon",
+            "url": f"https://www.ozon.ru/search/?text={encoded}+юбка",
+        },
+        {
+            "title": "Кроссовки минималистичные",
+            "marketplace": "Lamoda",
+            "url": (
+                "https://www.lamoda.ru/catalogsearch/result/?q="
+                f"{encoded}+кроссовки"
+            ),
+        },
+        {
+            "title": "Сумка через плечо",
+            "marketplace": "Яндекс Маркет",
+            "url": f"https://market.yandex.ru/search?text={encoded}+сумка",
+        },
+        {
+            "title": "Пальто демисезонное",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+пальто"
+            ),
+        },
+        {
+            "title": "Аксессуары к образу",
+            "marketplace": "Ozon",
+            "url": f"https://www.ozon.ru/search/?text={encoded}+аксессуары",
+        },
+    ]
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/marketplace/search-by-image")
+def marketplace_search_by_image(
+    payload: MarketplaceSearchPayload,
+) -> dict[str, Any]:
+    seed_parts: list[str] = []
+    if payload.query:
+        seed_parts.append(payload.query.strip())
+    if payload.imageUrl:
+        seed_parts.append("изображение")
+    if payload.imagePath:
+        seed_parts.append("фото")
+
+    seed_query = (
+        " ".join(part for part in seed_parts if part).strip() or "стильная одежда"
+    )
+    results = build_marketplace_stub_results(seed_query)[:10]
+    return {
+        "results": results,
+        "source": "stub",
+        "count": len(results),
+    }
 
 
 @app.post("/users/{email}/bootstrap")

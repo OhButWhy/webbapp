@@ -182,4 +182,17 @@ class BackendApiService {
     final data = await _get('/ai/prompt-preview', {'email': email});
     return data['systemPrompt']?.toString() ?? '';
   }
+
+  Future<List<Map<String, dynamic>>> searchMarketplaceByImage({
+    String? imageUrl,
+    String? imagePath,
+    String? query,
+  }) async {
+    final data = await _post('/marketplace/search-by-image', {
+      'imageUrl': imageUrl,
+      'imagePath': imagePath,
+      'query': query,
+    });
+    return List<Map<String, dynamic>>.from(data['results'] ?? const []);
+  }
 }

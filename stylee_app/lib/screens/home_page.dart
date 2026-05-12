@@ -3,10 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:stylee_app/components/marketplace_search_button.dart';
 import 'package:stylee_app/components/drawer.dart';
 import 'package:stylee_app/screens/chat_page.dart';
 import 'package:stylee_app/screens/editor_page.dart';
 import 'package:stylee_app/screens/edit_profile_page.dart';
+import 'package:stylee_app/screens/marketplace_search_screen.dart';
 import 'package:stylee_app/screens/profile_page.dart';
 import 'package:stylee_app/screens/wardrobe_page.dart';
 
@@ -530,6 +532,24 @@ class _HomePageState extends State<HomePage> {
                       icon: Icons.bookmark_border,
                       color: Colors.white,
                       size: 32,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Marketplace (M) - between bookmark and share
+                    MarketplaceSearchButton(
+                      size: 44,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => MarketplaceSearchScreen(
+                              imageUrl: imageUrl,
+                              imagePath: imageUrl,
+                              queryHint: caption.toString(),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                     
                     const SizedBox(height: 20),
