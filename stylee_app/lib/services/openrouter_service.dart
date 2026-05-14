@@ -36,7 +36,7 @@ class OpenRouterService {
       imageBytes: bytes,
       imageMimeType: mimeType,
     );
-
+  }
 
   String _guessMimeType(String pathOrName) {
     final lower = pathOrName.toLowerCase();
@@ -44,7 +44,6 @@ class OpenRouterService {
     if (lower.endsWith('.webp')) return 'image/webp';
     if (lower.endsWith('.gif')) return 'image/gif';
     return 'image/jpeg';
-  }
   }
 
   Future<String> getStyleAdviceWithImageBytes({
