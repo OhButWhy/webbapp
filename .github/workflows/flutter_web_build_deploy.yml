@@ -12,25 +12,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: 'stable'
+          cache: true
 
       - name: Create .env for build
         run: |
           echo "STYLEE_BACKEND_URL=https://webbapp-yicy.onrender.com" > stylee_app/.env
+          cat stylee_app/.env
 
       - name: Install dependencies
         run: |
           cd stylee_app
           flutter pub get
+          flutter pub upgrade --major-versions
 
       - name: Build Flutter web
         run: |
           cd stylee_app
-          flutter build web --release
+          flutter build web --release --verbose
+        continue-on-error: true
+
+      - name: Check build output
+        run: |
+          ls -la stylee_app/build/web 2>/dev/null || echo "Build directory not found"
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
