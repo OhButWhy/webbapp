@@ -21,6 +21,7 @@ class QuizWizard extends StatefulWidget {
 class _QuizWizardState extends State<QuizWizard> {
   int _currentQuestionIndex = 0;
   Map<String, dynamic> _answers = {};
+  bool _isFinishing = false;
 
   @override
   void initState() {
@@ -69,7 +70,14 @@ class _QuizWizardState extends State<QuizWizard> {
   @override
   Widget build(BuildContext context) {
     if (_currentQuestionIndex >= QuizQuestions.questions.length) {
-      _finishQuiz();
+      if (!_isFinishing) {
+        _isFinishing = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _finishQuiz();
+          }
+        });
+      }
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );

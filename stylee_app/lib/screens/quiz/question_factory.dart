@@ -339,10 +339,11 @@ class _MultiSelectPageState extends State<_MultiSelectPage> {
     });
 
     try {
-      // Сохраняем в локальное хранилище (fallback)
-      final saved = await SelectionStorage.save(widget.questionId, _selectedItems);
+      // Локальное сохранение не должно блокировать переход дальше.
+      final saved = await SelectionStorage.save(widget.questionId, _selectedItems)
+          .timeout(const Duration(seconds: 2), onTimeout: () => false);
 
-      // Сохраняем HEX-данные
+      // HEX-данные сохраняем отдельно и тоже не держим экран в ожидании.
       await HexSelectionStorage.save(
         widget.questionId,
         _selectedItems
@@ -351,7 +352,7 @@ class _MultiSelectPageState extends State<_MultiSelectPage> {
                   'hex': _ColorPickerHelper.getHexValue(widget.questionId, name),
                 })
             .toList(),
-      );
+      ).timeout(const Duration(seconds: 2), onTimeout: () => false);
 
       if (!saved) {
         // Если локальное сохранение не удалось — не блокируем пользователя
@@ -373,6 +374,9 @@ class _MultiSelectPageState extends State<_MultiSelectPage> {
       }
 
       if (mounted) {
+        setState(() {
+          _isContinuing = false;
+        });
         widget.onContinue({widget.questionId: List<String>.from(_selectedItems)});
       }
     } catch (e) {
