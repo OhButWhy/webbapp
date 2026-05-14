@@ -23,11 +23,13 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.41.9'
+          channel: 'stable'
           cache: true
 
       - name: Tool versions
         run: |
+          flutter config --no-analytics
           flutter --version
           dart --version
 
@@ -44,7 +46,7 @@ jobs:
       - name: Build Flutter web
         run: |
           cd stylee_app
-          flutter build web --release --verbose
+          flutter build web --release --verbose --base-href "/${{ github.event.repository.name }}/"
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
