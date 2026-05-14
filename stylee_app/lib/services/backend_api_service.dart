@@ -23,20 +23,26 @@ class BackendApiService {
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) async {
+    print('[BackendAPI._post] path=$path, body=$body');
     final response = await http.post(
       _uri(path),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
+    final respPreview = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
+    print('[BackendAPI._post] response=${response.statusCode}, body=$respPreview');
     return _decodeResponse(response);
   }
 
   Future<Map<String, dynamic>> _put(String path, Map<String, dynamic> body) async {
+    print('[BackendAPI._put] path=$path, body=$body');
     final response = await http.put(
       _uri(path),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
+    final respPreview = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
+    print('[BackendAPI._put] response=${response.statusCode}, body=$respPreview');
     return _decodeResponse(response);
   }
 

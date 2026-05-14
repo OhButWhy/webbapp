@@ -133,15 +133,19 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
       );
 
       // Инициализировать юзера в бэкенде
+      print('[SetupProfile] Bootstrapping user: ${widget.email}');
       await _backend.bootstrapUser(widget.email);
+      print('[SetupProfile] Saving profile...');
       await _backend.saveProfile(
         email: widget.email,
         username: username,
         bio: _bioController.text.trim(),
         profileImagePath: savedImagePath,
       );
+      print('[SetupProfile] Profile saved successfully');
 
       // Начать прохождение теста
+      print('[SetupProfile] Starting quiz...');
       final testResult = await Navigator.push<TestResult?>(
         context,
         MaterialPageRoute(
@@ -156,7 +160,11 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
       // Сохранить результат теста если есть
       if (testResult != null) {
+        print('[SetupProfile] Saving test result...');
         await _saveTestResult(testResult);
+        print('[SetupProfile] Test result saved');
+      } else {
+        print('[SetupProfile] No test result returned');
       }
 
       if (_enableTwoFactor) {
@@ -181,9 +189,12 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
   Future<void> _saveTestResult(TestResult result) async {
     try {
-      await _backend.saveTestResult(widget.email, result.toMap());
+      print('[SetupProfile._saveTestResult] Calling backend.saveTestResult with: ${result.toMap()}');
+      final response = await _backend.saveTestResult(widget.email, result.toMap());
+      print('[SetupProfile._saveTestResult] Success, response: $response');
     } catch (e) {
-      print('Error saving test result: $e');
+      print('[SetupProfile._saveTestResult] Error: $e');
+      rethrow;
     }
   }
 

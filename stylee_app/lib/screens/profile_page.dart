@@ -153,6 +153,8 @@ class _ProfilePageState extends State<ProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Вы вышли из аккаунта')),
       );
+      // Navigate back to login screen and clear all previous routes
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
     }
   }
 
