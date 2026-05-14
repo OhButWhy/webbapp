@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -110,13 +111,19 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
       String? savedImagePath;
       if (_profileImagePath != null) {
-        final directory = await getApplicationDocumentsDirectory();
-        final fileName = 'profile_${widget.email.replaceAll('@', '_').replaceAll('.', '_')}.jpg';
-        savedImagePath = '${directory.path}/$fileName';
-        
-        final file = File(_profileImagePath!);
-        if (file.existsSync()) {
-          await file.copy(savedImagePath);
+        if (kIsWeb) {
+          // On Flutter Web we can't use path_provider or reliably copy files to app storage.
+          // Keep the picked reference as-is for demo purposes.
+          savedImagePath = _profileImagePath;
+        } else {
+          final directory = await getApplicationDocumentsDirectory();
+          final fileName = 'profile_${widget.email.replaceAll('@', '_').replaceAll('.', '_')}.jpg';
+          savedImagePath = '${directory.path}/$fileName';
+
+          final file = File(_profileImagePath!);
+          if (file.existsSync()) {
+            await file.copy(savedImagePath);
+          }
         }
       }
 
@@ -424,7 +431,9 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
                         radius: 60,
                         backgroundColor: const Color(0xFFF8E8EA),
                         backgroundImage: _profileImagePath != null
-                            ? FileImage(File(_profileImagePath!))
+                            ? (kIsWeb
+                                ? NetworkImage(_profileImagePath!)
+                                : FileImage(File(_profileImagePath!)) as ImageProvider)
                             : null,
                         child: _profileImagePath == null
                             ? const Icon(

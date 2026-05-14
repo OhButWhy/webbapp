@@ -1,9 +1,8 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:stylee_app/models/dislike.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
 import 'package:stylee_app/services/dislike_service.dart';
@@ -24,7 +23,8 @@ class _ChatPageState extends State<ChatPage> {
   final _dislikeService = DislikeService();
   bool _isLoading = false;
   bool _showSidebar = false;
-  String? _selectedImagePath;
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageMimeType;
   
   String? _currentChatId;
   List<Map<String, dynamic>> _messages = [];
@@ -82,7 +82,12 @@ class _ChatPageState extends State<ChatPage> {
       ).timeout(const Duration(seconds: 30));
 
       if (image != null && mounted) {
-        setState(() => _selectedImagePath = image.path);
+        final bytes = await image.readAsBytes();
+        final mimeType = _guessMimeType(image.name.isNotEmpty ? image.name : image.path);
+        setState(() {
+          _selectedImageBytes = bytes;
+          _selectedImageMimeType = mimeType;
+        });
       }
     } catch (e) {
       // ignore: avoid_print
@@ -91,12 +96,23 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _attachImage() async {
-    if (_selectedImagePath == null) return;
+    if (_selectedImageBytes == null) return;
     await _sendMessage(isImage: true);
   }
 
   void _removeImage() {
-    setState(() => _selectedImagePath = null);
+    setState(() {
+      _selectedImageBytes = null;
+      _selectedImageMimeType = null;
+    });
+  }
+
+  String _guessMimeType(String pathOrName) {
+    final lower = pathOrName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
   }
 
   Future<void> _loadMessages(String chatId) async {
@@ -169,7 +185,7 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _sendMessage({bool isImage = false}) async {
     final userText = _controller.text.trim();
     
-    if (userText.isEmpty && _selectedImagePath == null) return;
+    if (userText.isEmpty && _selectedImageBytes == null) return;
     if (!mounted) return;
     
     if (_currentChatId == null) {
@@ -181,24 +197,13 @@ class _ChatPageState extends State<ChatPage> {
     _controller.clear();
 
     try {
-      String? savedImagePath;
-      if (_selectedImagePath != null) {
-        final directory = await getApplicationDocumentsDirectory();
-        final fileName = 'chat_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        savedImagePath = '${directory.path}/$fileName';
-        final file = File(_selectedImagePath!);
-        if (file.existsSync()) {
-          await file.copy(savedImagePath);
-        }
-      }
-
       final openRouterService = OpenRouterService();
-      if (isImage && savedImagePath != null) {
-        await openRouterService.getStyleAdviceWithImage(
+      if (_selectedImageBytes != null) {
+        await openRouterService.getStyleAdviceWithImageBytes(
           userEmail: currentUser.email!,
           userMessage: userText,
-          imagePath: savedImagePath,
-          dislikes: _userDislikes,
+          imageBytes: _selectedImageBytes!,
+          imageMimeType: _selectedImageMimeType ?? 'image/jpeg',
         );
       } else {
         await openRouterService.getStyleAdvice(
@@ -208,7 +213,8 @@ class _ChatPageState extends State<ChatPage> {
         );
       }
 
-      _selectedImagePath = null;
+      _selectedImageBytes = null;
+      _selectedImageMimeType = null;
       await _loadMessages(_currentChatId!);
 
       if (mounted) {
@@ -457,7 +463,7 @@ class _ChatPageState extends State<ChatPage> {
               ),
             ),
             const SizedBox(height: 32),
-            if (_selectedImagePath != null && File(_selectedImagePath!).existsSync())
+            if (_selectedImageBytes != null)
               Stack(
                 children: [
                   Container(
@@ -466,7 +472,7 @@ class _ChatPageState extends State<ChatPage> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       image: DecorationImage(
-                        image: FileImage(File(_selectedImagePath!)),
+                        image: MemoryImage(_selectedImageBytes!),
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -488,7 +494,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ],
               ),
-            if (_selectedImagePath != null && File(_selectedImagePath!).existsSync()) const SizedBox(height: 16),
+            if (_selectedImageBytes != null) const SizedBox(height: 16),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -538,7 +544,7 @@ class _ChatPageState extends State<ChatPage> {
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: _isLoading ? null : () {
-                      if (_selectedImagePath != null && File(_selectedImagePath!).existsSync()) {
+                      if (_selectedImageBytes != null) {
                         _attachImage();
                       } else {
                         _sendMessage();
@@ -621,7 +627,7 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildUserImageMessage(Map<String, dynamic> message) {
     final imagePath = message['imagePath'] as String?;
     final text = message['text'] as String?;
-    final fileExists = imagePath != null && File(imagePath).existsSync();
+    final isUrl = imagePath != null && (imagePath.startsWith('http://') || imagePath.startsWith('https://') || imagePath.startsWith('blob:') || imagePath.startsWith('data:'));
     
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -647,11 +653,11 @@ class _ChatPageState extends State<ChatPage> {
                 style: const TextStyle(color: Colors.white, fontSize: 15),
               ),
             ),
-          if (fileExists)
+          if (isUrl)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                File(imagePath),
+              child: Image.network(
+                imagePath!,
                 width: 80,
                 height: 80,
                 fit: BoxFit.cover,
@@ -807,7 +813,7 @@ class _ChatPageState extends State<ChatPage> {
       ),
       child: Column(
         children: [
-          if (_selectedImagePath != null && File(_selectedImagePath!).existsSync())
+          if (_selectedImageBytes != null)
             Container(
               margin: const EdgeInsets.only(bottom: 8),
               child: Row(
@@ -818,7 +824,7 @@ class _ChatPageState extends State<ChatPage> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
                       image: DecorationImage(
-                        image: FileImage(File(_selectedImagePath!)),
+                        image: MemoryImage(_selectedImageBytes!),
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -892,7 +898,7 @@ class _ChatPageState extends State<ChatPage> {
                 onTap: _isLoading
                     ? null
                     : () {
-                        if (_selectedImagePath != null && File(_selectedImagePath!).existsSync()) {
+                        if (_selectedImageBytes != null) {
                           _attachImage();
                         } else {
                           _sendMessage();

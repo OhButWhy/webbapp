@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -34,6 +35,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadLocalImagePath() async {
     try {
+      if (kIsWeb) return;
       final directory = await getApplicationDocumentsDirectory();
       final fileName = 'profile_${currentUser.email!.replaceAll('@', '_').replaceAll('.', '_')}.jpg';
       final path = '${directory.path}/$fileName';
@@ -72,6 +74,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _saveImageLocally(String imagePath) async {
     try {
+      if (kIsWeb) {
+        await usersCollection.doc(currentUser.email).update({
+          'profileImagePath': imagePath,
+        }).timeout(const Duration(seconds: 5));
+
+        if (mounted) {
+          setState(() => _localProfileImagePath = imagePath);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Фото обновлено!')),
+          );
+        }
+        return;
+      }
+
       final directory = await getApplicationDocumentsDirectory();
       final fileName = 'profile_${currentUser.email!.replaceAll('@', '_').replaceAll('.', '_')}.jpg';
       final savedPath = '${directory.path}/$fileName';
@@ -197,10 +213,12 @@ class _ProfilePageState extends State<ProfilePage> {
                               CircleAvatar(
                                 radius: 50,
                                 backgroundColor: const Color(0xFFF8E8EA),
-                                backgroundImage: (displayImagePath != null && File(displayImagePath).existsSync())
-                                    ? FileImage(File(displayImagePath))
-                                    : null,
-                                child: (displayImagePath == null || !File(displayImagePath!).existsSync()) && !_isUploading
+                                backgroundImage: (displayImagePath != null && kIsWeb)
+                                    ? NetworkImage(displayImagePath)
+                                    : (displayImagePath != null && File(displayImagePath).existsSync())
+                                        ? FileImage(File(displayImagePath))
+                                        : null,
+                                child: (displayImagePath == null || (!kIsWeb && !File(displayImagePath!).existsSync())) && !_isUploading
                                     ? Icon(
                                         Icons.person,
                                         size: 60,
@@ -467,6 +485,8 @@ class _ProfilePageState extends State<ProfilePage> {
                               final post = posts[index];
                               final postData = post.data() as Map<String, dynamic>;
                               final imageUrl = postData['imageUrl'] as String?;
+                              final hasLocalFile = !kIsWeb && imageUrl != null && File(imageUrl).existsSync();
+                              final hasWebImage = kIsWeb && imageUrl != null && imageUrl.isNotEmpty;
 
                               return GestureDetector(
                                 onTap: () {
@@ -497,15 +517,14 @@ class _ProfilePageState extends State<ProfilePage> {
                                 },
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    image: imageUrl != null && File(imageUrl).existsSync()
-                                        ? DecorationImage(
-                                            image: FileImage(File(imageUrl)),
-                                            fit: BoxFit.cover,
-                                          )
-                                        : null,
+                                    image: hasLocalFile
+                                        ? DecorationImage(image: FileImage(File(imageUrl!)), fit: BoxFit.cover)
+                                        : hasWebImage
+                                            ? DecorationImage(image: NetworkImage(imageUrl!), fit: BoxFit.cover)
+                                            : null,
                                     color: Colors.grey.shade200,
                                   ),
-                                  child: imageUrl == null || !File(imageUrl).existsSync()
+                                  child: imageUrl == null || (!kIsWeb && !File(imageUrl).existsSync())
                                       ? const Icon(
                                           Icons.image_not_supported,
                                           color: Colors.grey,

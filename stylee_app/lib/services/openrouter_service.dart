@@ -1,8 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:stylee_app/models/dislike.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
+import 'package:stylee_app/utils/read_file_bytes.dart';
 
 class OpenRouterService {
   final BackendApiService _backend = BackendApiService.instance;
@@ -27,26 +28,37 @@ class OpenRouterService {
     required String imagePath,
     List<Dislike> dislikes = const [],
   }) async {
-    final file = File(imagePath);
-    if (!file.existsSync()) {
-      return '❌ Ошибка: файл изображения не найден';
-    }
+    final bytes = await readFileBytes(imagePath);
+    final mimeType = _guessMimeType(imagePath);
+    return getStyleAdviceWithImageBytes(
+      userEmail: userEmail,
+      userMessage: userMessage,
+      imageBytes: bytes,
+      imageMimeType: mimeType,
+    );
 
-    final bytes = await file.readAsBytes();
-    final base64Image = base64Encode(bytes);
-    String mimeType = 'image/jpeg';
-    if (imagePath.toLowerCase().endsWith('.png')) {
-      mimeType = 'image/png';
-    } else if (imagePath.toLowerCase().endsWith('.webp')) {
-      mimeType = 'image/webp';
-    }
 
+  String _guessMimeType(String pathOrName) {
+    final lower = pathOrName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
+  }
+  }
+
+  Future<String> getStyleAdviceWithImageBytes({
+    required String userEmail,
+    required String userMessage,
+    required Uint8List imageBytes,
+    required String imageMimeType,
+  }) async {
+    final base64Image = base64Encode(imageBytes);
     final response = await _backend.sendAiChat(
       email: userEmail,
       message: userMessage,
       imageBase64: base64Image,
-      imageMimeType: mimeType,
-      imagePath: imagePath,
+      imageMimeType: imageMimeType,
     );
     return response['answer']?.toString() ?? '';
   }

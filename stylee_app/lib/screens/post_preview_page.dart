@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -20,6 +21,13 @@ class _PostPreviewPageState extends State<PostPreviewPage> {
   bool _isUploading = false;
 
   Future<void> _publishPost() async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Публикация постов недоступна в web-демо'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
     setState(() => _isUploading = true);
 
     try {
@@ -97,7 +105,9 @@ class _PostPreviewPageState extends State<PostPreviewPage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Image.file(File(widget.imagePath), fit: BoxFit.cover),
+                    child: kIsWeb
+                        ? Image.network(widget.imagePath, fit: BoxFit.cover)
+                        : Image.file(File(widget.imagePath), fit: BoxFit.cover),
                 ),
               ),
             ),
