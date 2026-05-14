@@ -1,0 +1,19 @@
+# Build files
+build/
+*.apk
+*.aab
+*.jar
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local env
+.env
