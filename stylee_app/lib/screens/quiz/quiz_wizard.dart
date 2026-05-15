@@ -34,10 +34,10 @@ class _QuizWizardState extends State<QuizWizard> {
         'waist': widget.existingResult?.waist,
         'hips': widget.existingResult?.hips,
         'city': widget.existingResult?.city,
-        'preferredStyles': widget.existingResult?.preferredStyles,
-        'favoriteColors': widget.existingResult?.favoriteColors,
-        'avoidedColors': widget.existingResult?.avoidedColors,
-        'fitPreference': widget.existingResult?.fitPreference,
+        'styles': widget.existingResult?.preferredStyles,
+        'favorite_colors': widget.existingResult?.favoriteColors,
+        'avoided_colors': widget.existingResult?.avoidedColors,
+        'fit': widget.existingResult?.fitPreference,
         'specialNotes': widget.existingResult?.specialNotes,
       };
     }
@@ -58,10 +58,10 @@ class _QuizWizardState extends State<QuizWizard> {
       waist: _answers['waist'] != null ? double.tryParse(_answers['waist'].toString()) : null,
       hips: _answers['hips'] != null ? double.tryParse(_answers['hips'].toString()) : null,
       city: _answers['city'] as String?,
-      preferredStyles: _answers['preferredStyles'] is List ? List<String>.from(_answers['preferredStyles']!) : null,
-      favoriteColors: _answers['favoriteColors'] is List ? List<String>.from(_answers['favoriteColors']!) : null,
-      avoidedColors: _answers['avoidedColors'] is List ? List<String>.from(_answers['avoidedColors']!) : null,
-      fitPreference: _answers['fitPreference'] as String?,
+      preferredStyles: _answers['styles'] is List ? List<String>.from(_answers['styles']!) : <String>[],
+      favoriteColors: _answers['favorite_colors'] is List ? List<String>.from(_answers['favorite_colors']!) : <String>[],
+      avoidedColors: _answers['avoided_colors'] is List ? List<String>.from(_answers['avoided_colors']!) : <String>[],
+      fitPreference: _answers['fit'] as String?,
       specialNotes: _answers['specialNotes'] as String?,
     );
     widget.onComplete(result);
