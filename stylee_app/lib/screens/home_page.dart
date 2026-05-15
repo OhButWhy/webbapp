@@ -268,7 +268,10 @@ class _HomePageState extends State<HomePage> {
     }
 
     final isFeed = _selectedIndex == 0;
-
+    // If demo feed is forced, bypass Firestore stream entirely and show stable demo feed.
+    if (isFeed && _forceDemoFeed) {
+      currentPage = _buildDemoFeedPage();
+    }
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -307,6 +310,19 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
       ),
+    );
+  }
+
+  Widget _buildDemoFeedPage() {
+    return Stack(
+      children: [
+        PageView.builder(
+          scrollDirection: Axis.vertical,
+          itemCount: _demoPosts.length,
+          itemBuilder: (context, index) => _buildDemoPostItem(index),
+        ),
+        _buildTopMenu(),
+      ],
     );
   }
 
