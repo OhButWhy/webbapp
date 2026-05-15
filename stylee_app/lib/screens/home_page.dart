@@ -33,6 +33,7 @@ class _HomePageState extends State<HomePage> {
   final List<String> _colorOptions = ['чёрный', 'белый', 'красный', 'синий', 'серый', 'голубой'];
 
   final Map<String, Map<String, dynamic>> _usersCache = {};
+  bool _debugMode = false;
 
   void _onBottomNavTap(int index) {
     setState(() => _selectedIndex = index);
@@ -69,6 +70,21 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error toggling like in feed: $e');
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _debugMode = Uri.base.queryParameters['debug'] == '1';
+  }
+
+  Widget _placeholderImageWidget() {
+    return Container(
+      color: Colors.grey.shade900,
+      child: const Center(
+        child: Icon(Icons.image_not_supported, size: 72, color: Colors.white24),
+      ),
+    );
   }
 
   // Demo posts for the public demo build when Firestore has no posts or writes are disabled
@@ -379,6 +395,32 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _wrapWithDebug(Widget child, AsyncSnapshot<QuerySnapshot> snapshot) {
+    if (!_debugMode) return child;
+    final docsCount = snapshot.data?.docs.length ?? 0;
+    final sample = docsCount > 0 ? snapshot.data!.docs.first.data().toString() : '';
+    return Stack(
+      children: [
+        child,
+        Positioned(
+          top: 80,
+          right: 12,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('debug: posts=$docsCount', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                if (sample.isNotEmpty) SizedBox(width: 200, child: Text(sample, style: const TextStyle(color: Colors.white70, fontSize: 11), maxLines: 4, overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTopTab(String title, bool isActive) {
     return GestureDetector(
       onTap: () {
@@ -411,7 +453,19 @@ class _HomePageState extends State<HomePage> {
         Widget imageWidget;
         if (imageUrl != null && imageUrl.isNotEmpty) {
           if (imageUrl.startsWith('http') || imageUrl.startsWith('data:')) {
-            imageWidget = Image.network(imageUrl, width: double.infinity, height: double.infinity, fit: BoxFit.contain);
+            imageWidget = Image.network(
+              imageUrl,
+              width: double.infinity,
+              height: double.infinity,
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return const Center(child: CircularProgressIndicator());
+              },
+              errorBuilder: (context, error, stack) {
+                return _placeholderImageWidget();
+              },
+            );
           } else if (!kIsWeb && File(imageUrl).existsSync()) {
             imageWidget = Image.file(File(imageUrl), width: double.infinity, height: double.infinity, fit: BoxFit.contain);
           } else {

@@ -358,7 +358,7 @@ def _call_openrouter_model(
         raise HTTPException(status_code=502, detail="Unexpected OpenRouter response shape") from error
 
 
-def call_openrouter(system_prompt: str, user_message: str, image_base64: Optional[str] = None, image_mime_type: Optional[str] = None) -> str:
+def call_openrouter(system_prompt: str, user_message: str, image_base64: Optional[str] = None, image_mime_type: Optional[str] = None) -> tuple[str, str]:
     models = [OPENROUTER_MODEL]
     if OPENROUTER_FALLBACK_MODEL and OPENROUTER_FALLBACK_MODEL not in models:
         models.append(OPENROUTER_FALLBACK_MODEL)
@@ -370,7 +370,7 @@ def call_openrouter(system_prompt: str, user_message: str, image_base64: Optiona
                 print(f"[call_openrouter] retrying with fallback model={model}")
             result = _call_openrouter_model(model, system_prompt, user_message, image_base64, image_mime_type)
             print(f"[call_openrouter] model={model} succeeded")
-            return result
+            return result, model
         except HTTPException as error:
             last_error = error
             # allow retry for 400, 403, 404 so fallback models are attempted when Qwen is unavailable or quota-limited
@@ -746,7 +746,7 @@ def ai_chat(payload: AiChatPayload) -> dict[str, Any]:
         dislikes = profile.get("dislikes") or []
         system_prompt = build_system_prompt(profile, dislikes)
 
-        response_text = call_openrouter(
+        response_text, used_model = call_openrouter(
             system_prompt=system_prompt,
             user_message=payload.message,
             image_base64=payload.imageBase64,
@@ -804,6 +804,7 @@ def ai_chat(payload: AiChatPayload) -> dict[str, Any]:
     return {
         "chatId": chat_id,
         "answer": response_text,
+        "usedModel": used_model,
         "userMessageId": user_message_id,
         "aiMessageId": ai_message_id,
     }
