@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:stylee_app/auth/login_or_register.dart';
 import 'package:stylee_app/screens/home_page.dart';
-import 'package:stylee_app/screens/onboarding_test_screen.dart';
+import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
 import 'package:stylee_app/models/test_result.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
 
@@ -82,7 +82,10 @@ class _UserGateState extends State<UserGate> {
       return const Center(child: CircularProgressIndicator());
     }
     if (!_hasTestResult) {
-      return OnboardingTestScreen(onComplete: _onTestComplete);
+      return QuizWizard(
+        existingResult: null,
+        onComplete: _onTestComplete,
+      );
     }
     return const HomePage();
   }

@@ -40,6 +40,7 @@ except Exception:
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "qwen/qwen-vl-plus")
+OPENROUTER_FALLBACK_MODEL = os.getenv("OPENROUTER_FALLBACK_MODEL", "openai/gpt-4o-mini")
 BACKEND_NAME = os.getenv("STYLEE_BACKEND_NAME", "Stylee Python Backend")
 
 
@@ -291,7 +292,13 @@ def build_system_prompt(profile: dict[str, Any], dislikes: list[dict[str, Any]])
     return "\n".join(prompt)
 
 
-def call_openrouter(system_prompt: str, user_message: str, image_base64: Optional[str] = None, image_mime_type: Optional[str] = None) -> str:
+def _call_openrouter_model(
+    model: str,
+    system_prompt: str,
+    user_message: str,
+    image_base64: Optional[str] = None,
+    image_mime_type: Optional[str] = None,
+) -> str:
     if not OPENROUTER_API_KEY:
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY is not configured")
 
@@ -314,7 +321,7 @@ def call_openrouter(system_prompt: str, user_message: str, image_base64: Optiona
         user_content = user_message or "Опиши этот образ и дай стилистические рекомендации."
 
     payload = {
-        "model": OPENROUTER_MODEL,
+        "model": model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
@@ -349,6 +356,28 @@ def call_openrouter(system_prompt: str, user_message: str, image_base64: Optiona
         return data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as error:
         raise HTTPException(status_code=502, detail="Unexpected OpenRouter response shape") from error
+
+
+def call_openrouter(system_prompt: str, user_message: str, image_base64: Optional[str] = None, image_mime_type: Optional[str] = None) -> str:
+    models = [OPENROUTER_MODEL]
+    if OPENROUTER_FALLBACK_MODEL and OPENROUTER_FALLBACK_MODEL not in models:
+        models.append(OPENROUTER_FALLBACK_MODEL)
+
+    last_error: Optional[HTTPException] = None
+    for model in models:
+        try:
+            if model != OPENROUTER_MODEL:
+                print(f"[call_openrouter] retrying with fallback model={model}")
+            return _call_openrouter_model(model, system_prompt, user_message, image_base64, image_mime_type)
+        except HTTPException as error:
+            last_error = error
+            if error.status_code not in {400, 404}:
+                raise
+
+    if last_error is not None:
+        raise last_error
+
+    raise HTTPException(status_code=502, detail="OpenRouter request failed")
 
 
 def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
