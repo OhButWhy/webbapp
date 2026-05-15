@@ -368,10 +368,13 @@ def call_openrouter(system_prompt: str, user_message: str, image_base64: Optiona
         try:
             if model != OPENROUTER_MODEL:
                 print(f"[call_openrouter] retrying with fallback model={model}")
-            return _call_openrouter_model(model, system_prompt, user_message, image_base64, image_mime_type)
+            result = _call_openrouter_model(model, system_prompt, user_message, image_base64, image_mime_type)
+            print(f"[call_openrouter] model={model} succeeded")
+            return result
         except HTTPException as error:
             last_error = error
-            if error.status_code not in {400, 404}:
+            # allow retry for 400, 403, 404 so fallback models are attempted when Qwen is unavailable or quota-limited
+            if error.status_code not in {400, 403, 404}:
                 raise
 
     if last_error is not None:

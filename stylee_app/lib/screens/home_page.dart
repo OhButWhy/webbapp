@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +69,60 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error toggling like in feed: $e');
     }
+  }
+
+  // Demo posts for the public demo build when Firestore has no posts or writes are disabled
+  final List<Map<String, String>> _demoPosts = [
+    {'imageUrl': '', 'caption': 'Демо: лёгкий образ для прогулки'},
+    {'imageUrl': '', 'caption': 'Демо: повседневный базовый look'},
+    {'imageUrl': '', 'caption': 'Демо: вечерний образ'},
+  ];
+
+  Widget _buildDemoPostItem(int index) {
+    final data = _demoPosts[index];
+    final caption = data['caption'] ?? '';
+    final likesCount = 0;
+
+    return Stack(
+      children: [
+        Container(color: Colors.grey.shade900),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.3), Colors.transparent, Colors.black.withOpacity(0.8)]),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildSideAction(icon: Icons.favorite_border, color: Colors.white, size: 32, onTap: () { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Лайк (демо)'))); }),
+                const SizedBox(height: 4),
+                Text(likesCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 20),
+                _buildSideAction(icon: Icons.chat_bubble_outline, color: Colors.white, size: 32),
+                const SizedBox(height: 4),
+                const Text("0", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 12, right: 80, bottom: 24,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('@demo_user', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              if (caption.isNotEmpty) ...[const SizedBox(height: 8), Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14))],
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   bool get _hasActiveFeedFilters =>
@@ -261,17 +316,11 @@ class _HomePageState extends State<HomePage> {
           builder: (context, snapshot) {
             if (snapshot.hasError) return Center(child: Text('Ошибка: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.local_fire_department_outlined, size: 80, color: Colors.pink.shade300),
-                    const SizedBox(height: 24),
-                    const Text('Лента пуста', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    Text('Создайте первый пост ✨', style: TextStyle(color: Colors.grey.shade400)),
-                  ],
-                ),
+              // Show a small demo feed so reviewers can scroll and interact without Firestore posts
+              return PageView.builder(
+                scrollDirection: Axis.vertical,
+                itemCount: _demoPosts.length,
+                itemBuilder: (context, index) => _buildDemoPostItem(index),
               );
             }
 
@@ -359,12 +408,22 @@ class _HomePageState extends State<HomePage> {
         final userData = snapshot.data ?? {};
         final username = userData['username'] as String? ?? authorEmail.split('@').first;
         final profileImagePath = userData['profileImagePath'] as String?;
+        Widget imageWidget;
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          if (imageUrl.startsWith('http') || imageUrl.startsWith('data:')) {
+            imageWidget = Image.network(imageUrl, width: double.infinity, height: double.infinity, fit: BoxFit.contain);
+          } else if (!kIsWeb && File(imageUrl).existsSync()) {
+            imageWidget = Image.file(File(imageUrl), width: double.infinity, height: double.infinity, fit: BoxFit.contain);
+          } else {
+            imageWidget = Container(color: Colors.grey.shade900);
+          }
+        } else {
+          imageWidget = Container(color: Colors.grey.shade900);
+        }
 
         return Stack(
           children: [
-            (imageUrl != null && File(imageUrl).existsSync())
-                ? Image.file(File(imageUrl), width: double.infinity, height: double.infinity, fit: BoxFit.contain)
-                : Container(color: Colors.grey.shade900),
+            imageWidget,
 
             Positioned.fill(
               child: DecoratedBox(
