@@ -34,6 +34,7 @@ class _HomePageState extends State<HomePage> {
 
   final Map<String, Map<String, dynamic>> _usersCache = {};
   bool _debugMode = false;
+  bool _forceDemoFeed = false;
 
   void _onBottomNavTap(int index) {
     setState(() => _selectedIndex = index);
@@ -76,6 +77,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _debugMode = Uri.base.queryParameters['debug'] == '1';
+    _forceDemoFeed = Uri.base.queryParameters['demoFeed'] == '1';
   }
 
   Widget _placeholderImageWidget() {
@@ -330,6 +332,13 @@ class _HomePageState extends State<HomePage> {
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance.collection('posts').orderBy('createdAt', descending: true).snapshots(),
           builder: (context, snapshot) {
+            if (_forceDemoFeed) {
+              return PageView.builder(
+                scrollDirection: Axis.vertical,
+                itemCount: _demoPosts.length,
+                itemBuilder: (context, index) => _buildDemoPostItem(index),
+              );
+            }
             if (snapshot.hasError) return Center(child: Text('Ошибка: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
               // Show a small demo feed so reviewers can scroll and interact without Firestore posts
