@@ -106014,7 +106014,7 @@ l=s.r
 k=s.w
 j=s.x
 s=s.y
-this.e=A.a2(["height",r,"bust",q,"waist",p,"hips",o,"city",n,"preferredStyles",m,"favoriteColors",l,"avoidedColors",k,"fitPreference",j,"specialNotes",s],t.N,t.z)}},
+this.e=A.a2(["height",r,"bust",q,"waist",p,"hips",o,"city",n,"styles",m,"favorite_colors",l,"avoided_colors",k,"fit",j,"specialNotes",s],t.N,t.z)}},
 ajC(a){this.J(new A.aE6(this,a))},
 I(a){var s,r,q=this,p=q.d
 if(p>=7){if(!q.f){q.f=!0
@@ -106026,25 +106026,25 @@ $0(){var s=this.a
 s.e.O(0,this.b);++s.d},
 $S:0}
 A.aE7.prototype={
-$1(a){var s,r,q,p,o,n,m,l,k,j,i=null,h="preferredStyles",g="favoriteColors",f="avoidedColors",e=this.a
-if(e.c!=null){s=e.e.h(0,"height")!=null?A.he(J.bC(e.e.h(0,"height"))):i
-r=e.e.h(0,"bust")!=null?A.he(J.bC(e.e.h(0,"bust"))):i
-q=e.e.h(0,"waist")!=null?A.he(J.bC(e.e.h(0,"waist"))):i
-p=e.e.h(0,"hips")!=null?A.he(J.bC(e.e.h(0,"hips"))):i
-o=A.a5(e.e.h(0,"city"))
+$1(a){var s,r,q,p,o,n,m,l,k,j,i=null,h="favorite_colors",g="avoided_colors",f=this.a
+if(f.c!=null){s=f.e.h(0,"height")!=null?A.he(J.bC(f.e.h(0,"height"))):i
+r=f.e.h(0,"bust")!=null?A.he(J.bC(f.e.h(0,"bust"))):i
+q=f.e.h(0,"waist")!=null?A.he(J.bC(f.e.h(0,"waist"))):i
+p=f.e.h(0,"hips")!=null?A.he(J.bC(f.e.h(0,"hips"))):i
+o=A.a5(f.e.h(0,"city"))
 n=t.j
-if(n.b(e.e.h(0,h))){m=e.e.h(0,h)
+if(n.b(f.e.h(0,"styles"))){m=f.e.h(0,"styles")
 m.toString
-m=A.cs(m,!0,t.N)}else m=i
-if(n.b(e.e.h(0,g))){l=e.e.h(0,g)
+m=A.cs(m,!0,t.N)}else m=A.b([],t.s)
+if(n.b(f.e.h(0,h))){l=f.e.h(0,h)
 l.toString
-l=A.cs(l,!0,t.N)}else l=i
-if(n.b(e.e.h(0,f))){n=e.e.h(0,f)
+l=A.cs(l,!0,t.N)}else l=A.b([],t.s)
+if(n.b(f.e.h(0,g))){n=f.e.h(0,g)
 n.toString
-n=A.cs(n,!0,t.N)}else n=i
-k=A.a5(e.e.h(0,"fitPreference"))
-j=A.a5(e.e.h(0,"specialNotes"))
-e.a.P6(new A.lu(s,r,q,p,o,m,l,n,k,j))}},
+n=A.cs(n,!0,t.N)}else n=A.b([],t.s)
+k=A.a5(f.e.h(0,"fit"))
+j=A.a5(f.e.h(0,"specialNotes"))
+f.a.P6(new A.lu(s,r,q,p,o,m,l,n,k,j))}},
 $S:7}
 A.aE8.prototype={
 $1(a){return this.a.J(a)},
