@@ -89,6 +89,10 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  bool _isDisplayableNetworkLikeUrl(String url) {
+    return url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:');
+  }
+
   // Demo posts for the public demo build when Firestore has no posts or writes are disabled
   final List<Map<String, String>> _demoPosts = [
     {'imageUrl': '', 'caption': 'Демо: лёгкий образ для прогулки'},
@@ -257,7 +261,7 @@ class _HomePageState extends State<HomePage> {
     Widget currentPage;
     switch (_selectedIndex) {
       case 0: currentPage = _buildFeed(); break;
-      case 1: currentPage = const WardrobePage(); break;
+      case 1: currentPage = WardrobePage(onBackRequested: () => _onBottomNavTap(0)); break;
       case 2:
         // 🔥 Наше исправление: колбэк для возврата в профиль
         currentPage = EditorPage(onFinish: () => _onBottomNavTap(4));
@@ -272,43 +276,52 @@ class _HomePageState extends State<HomePage> {
     if (isFeed && _forceDemoFeed) {
       currentPage = _buildDemoFeedPage();
     }
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: isFeed ? Brightness.light : Brightness.dark,
-      ),
-      child: Scaffold(
-        backgroundColor: isFeed ? Colors.black : const Color(0xFFF5E6E8),
-        body: currentPage,
-        
-        // 🔥 Скрываем меню только на вкладке Editor
-        bottomNavigationBar: _selectedIndex == 2 
-            ? null 
-            : Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -2))],
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+    return WillPopScope(
+      onWillPop: () async {
+        if (_selectedIndex != 0) {
+          setState(() => _selectedIndex = 0);
+          return false;
+        }
+        return true;
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isFeed ? Brightness.light : Brightness.dark,
+        ),
+        child: Scaffold(
+          backgroundColor: isFeed ? Colors.black : const Color(0xFFF5E6E8),
+          body: currentPage,
+
+          // 🔥 Скрываем меню только на вкладке Editor
+          bottomNavigationBar: _selectedIndex == 2
+              ? null
+              : Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -2))],
+                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+                  ),
+                  child: BottomNavigationBar(
+                    currentIndex: _selectedIndex,
+                    onTap: _onBottomNavTap,
+                    type: BottomNavigationBarType.fixed,
+                    backgroundColor: Colors.transparent,
+                    elevation: 0,
+                    selectedItemColor: Colors.black87,
+                    unselectedItemColor: Colors.grey.shade600,
+                    selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                    unselectedLabelStyle: const TextStyle(fontSize: 11),
+                    items: [
+                      _buildNavItem(Icons.local_fire_department_outlined, 'Feed', 0),
+                      _buildNavItem(Icons.checkroom_outlined, 'Wardrobe', 1),
+                      _buildNavItem(Icons.auto_fix_high_outlined, 'Editor', 2),
+                      _buildNavItem(Icons.auto_awesome_outlined, 'AI Stylist', 3),
+                      _buildNavItem(Icons.person_outline, 'Profile', 4),
+                    ],
+                  ),
                 ),
-                child: BottomNavigationBar(
-                  currentIndex: _selectedIndex,
-                  onTap: _onBottomNavTap,
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  selectedItemColor: Colors.black87,
-                  unselectedItemColor: Colors.grey.shade600,
-                  selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                  unselectedLabelStyle: const TextStyle(fontSize: 11),
-                  items: [
-                    _buildNavItem(Icons.local_fire_department_outlined, 'Feed', 0),
-                    _buildNavItem(Icons.checkroom_outlined, 'Wardrobe', 1),
-                    _buildNavItem(Icons.auto_fix_high_outlined, 'Editor', 2),
-                    _buildNavItem(Icons.auto_awesome_outlined, 'AI Stylist', 3),
-                    _buildNavItem(Icons.person_outline, 'Profile', 4),
-                  ],
-                ),
-              ),
+        ),
       ),
     );
   }
@@ -477,7 +490,7 @@ class _HomePageState extends State<HomePage> {
         final profileImagePath = userData['profileImagePath'] as String?;
         Widget imageWidget;
         if (imageUrl != null && imageUrl.isNotEmpty) {
-          if (imageUrl.startsWith('http') || imageUrl.startsWith('data:')) {
+          if (_isDisplayableNetworkLikeUrl(imageUrl)) {
             imageWidget = Image.network(
               imageUrl,
               width: double.infinity,
@@ -570,7 +583,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildSideAction({IconData? icon, Color? color, double size = 32, VoidCallback? onTap, String? profileImagePath}) {
-    if (profileImagePath != null && File(profileImagePath).existsSync()) {
+    if (!kIsWeb && profileImagePath != null && File(profileImagePath).existsSync()) {
       return CircleAvatar(backgroundImage: FileImage(File(profileImagePath)), radius: size, backgroundColor: Colors.grey.shade300);
     }
     return GestureDetector(onTap: onTap, child: Icon(icon, color: color ?? Colors.white, size: size));

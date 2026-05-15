@@ -14,7 +14,9 @@ import 'package:stylee_app/components/section_picker_dialog.dart';
 import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
 
 class WardrobePage extends StatefulWidget {
-  const WardrobePage({super.key});
+  final VoidCallback? onBackRequested;
+
+  const WardrobePage({super.key, this.onBackRequested});
 
   @override
   State<WardrobePage> createState() => _WardrobePageState();
@@ -282,7 +284,15 @@ class _WardrobePageState extends State<WardrobePage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              if (widget.onBackRequested != null) {
+                widget.onBackRequested!();
+                return;
+              }
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
+            },
             child: Container(
               width: 40,
               height: 40,
