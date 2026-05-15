@@ -142,6 +142,19 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
         bio: _bioController.text.trim(),
         profileImagePath: savedImagePath,
       );
+      // Mirror profile to Firestore so frontend pages that read Firestore see the profile immediately
+      try {
+        await FirebaseFirestore.instance.collection('Users').doc(widget.email).set({
+          'email': widget.email,
+          'username': username,
+          'bio': _bioController.text.trim(),
+          'profileImagePath': savedImagePath,
+          'hasCompletedTest': false,
+        }, SetOptions(merge: true));
+        print('[SetupProfile] Firestore user doc created/updated');
+      } catch (e) {
+        print('[SetupProfile] Firestore write failed: $e');
+      }
       print('[SetupProfile] Profile saved successfully');
 
       // Начать прохождение теста
@@ -192,6 +205,16 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
       print('[SetupProfile._saveTestResult] Calling backend.saveTestResult with: ${result.toMap()}');
       final response = await _backend.saveTestResult(widget.email, result.toMap());
       print('[SetupProfile._saveTestResult] Success, response: $response');
+      // Mirror test result to Firestore so ProfilePage gating sees completion
+      try {
+        await FirebaseFirestore.instance.collection('Users').doc(widget.email).set({
+          'hasCompletedTest': true,
+          'testResult': result.toMap(),
+        }, SetOptions(merge: true));
+        print('[SetupProfile._saveTestResult] Firestore testResult written');
+      } catch (e) {
+        print('[SetupProfile._saveTestResult] Firestore write failed: $e');
+      }
     } catch (e) {
       print('[SetupProfile._saveTestResult] Error: $e');
       rethrow;
@@ -354,6 +377,18 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
         bio: '',
         profileImagePath: null,
       );
+      // Ensure Firestore doc exists as well for UI
+      try {
+        await FirebaseFirestore.instance.collection('Users').doc(widget.email).set({
+          'email': widget.email,
+          'username': randomUsername,
+          'bio': '',
+          'profileImagePath': null,
+          'hasCompletedTest': false,
+        }, SetOptions(merge: true));
+      } catch (e) {
+        print('[SetupProfile._skipSetup] Firestore write failed: $e');
+      }
 
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
