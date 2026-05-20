@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -6,7 +7,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:stylee_app/models/dislike.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
 import 'package:stylee_app/services/dislike_service.dart';
-import 'package:stylee_app/services/openrouter_service.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -197,20 +197,19 @@ class _ChatPageState extends State<ChatPage> {
     _controller.clear();
 
     try {
-      final openRouterService = OpenRouterService();
-      if (_selectedImageBytes != null) {
-        await openRouterService.getStyleAdviceWithImageBytes(
-          userEmail: currentUser.email!,
-          userMessage: userText,
-          imageBytes: _selectedImageBytes!,
-          imageMimeType: _selectedImageMimeType ?? 'image/jpeg',
-        );
-      } else {
-        await openRouterService.getStyleAdvice(
-          userText,
-          userEmail: currentUser.email!,
-          dislikes: _userDislikes,
-        );
+      // IMPORTANT: always pass chatId, otherwise backend creates a new chat and
+      // the UI keeps showing messages from the previous chat.
+      final response = await _backend.sendAiChat(
+        email: currentUser.email!,
+        chatId: _currentChatId,
+        message: userText,
+        imageBase64: _selectedImageBytes == null ? null : base64Encode(_selectedImageBytes!),
+        imageMimeType: _selectedImageBytes == null ? null : (_selectedImageMimeType ?? 'image/jpeg'),
+      );
+
+      final returnedChatId = response['chatId']?.toString();
+      if (returnedChatId != null && returnedChatId.isNotEmpty && returnedChatId != _currentChatId) {
+        setState(() => _currentChatId = returnedChatId);
       }
 
       _selectedImageBytes = null;
