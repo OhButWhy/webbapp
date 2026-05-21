@@ -436,10 +436,21 @@ def marketplace_search_by_image(
             results = real_search_by_image(
                 payload.imageUrl, payload.imagePath, payload.query, max_results=10
             )
-            return {"results": results, "source": "real", "count": len(results)}
+            # If real pipeline produced results, return them. Otherwise fall back to stub.
+            if results and len(results) > 0:
+                return {"results": results, "source": "real", "count": len(results)}
+            else:
+                import logging
+
+                logging.getLogger("backend").info(
+                    "real_search_by_image returned 0 results — falling back to stub"
+                )
     except Exception:
-        # fall through to stub on any unexpected error
-        pass
+        import logging
+
+        logging.getLogger("backend").exception(
+            "real_search_by_image failed — falling back to stub"
+        )
 
     seed_parts: list[str] = []
     if payload.query:
