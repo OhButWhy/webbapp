@@ -1,3 +1,4 @@
+import logging
 import os
 import requests
 from bs4 import BeautifulSoup
@@ -6,6 +7,15 @@ from io import BytesIO
 import imagehash
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
+
+# simple module logger
+logger = logging.getLogger("marketplace_real")
+if not logger.handlers:
+    # configure basic handler at INFO level so uvicorn logs capture it
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("[marketplace_real] %(levelname)s: %(message)s"))
+    logger.addHandler(h)
+    logger.setLevel(logging.INFO)
 
 
 COLOR_KEYWORDS = {
@@ -24,6 +34,7 @@ def download_image_to_bytes(url: str, timeout: int = 8) -> bytes | None:
         r.raise_for_status()
         return r.content
     except Exception:
+        logger.debug(f"download_image_to_bytes failed for {url}")
         return None
 
 
@@ -158,8 +169,11 @@ def fetch_marketplace_candidates(query: str) -> list[dict]:
         ]
         for url, domain in endpoints:
             try:
+                logger.info(f"fetching search page: {url}")
                 r = requests.get(url, headers=headers, timeout=6)
-                if r.status_code != 200:
+                status = getattr(r, 'status_code', None)
+                if status != 200:
+                    logger.warning(f"non-200 from {domain}: {status} for query={query}")
                     continue
                 # Use site-specific parsers when available
                 if 'wildberries' in domain:
@@ -168,9 +182,11 @@ def fetch_marketplace_candidates(query: str) -> list[dict]:
                     parsed = parse_ozon(r.text, domain)
                 else:
                     parsed = parse_search_results_from_html(r.text, domain)
+                logger.info(f"parsed {len(parsed)} candidates from {domain}")
                 for p in parsed:
                     candidates.append(p)
-            except Exception:
+            except Exception as e:
+                logger.exception(f"error fetching/parsing {domain} for query={query}: {e}")
                 continue
     except Exception:
         pass
@@ -207,6 +223,7 @@ def fetch_candidate_thumbnail_bytes(url: str, timeout: int = 3):
         meta = soup.find('meta', property='og:image')
         if meta and meta.get('content'):
             img_url = meta.get('content')
+            logger.info(f"found og:image for {url}: {img_url}")
             return download_image_to_bytes(img_url, timeout=timeout)
         # fallback: first image tag
         img = soup.find('img')
@@ -218,8 +235,10 @@ def fetch_candidate_thumbnail_bytes(url: str, timeout: int = 3):
                 from urllib.parse import urljoin
 
                 img_url = urljoin(url, img_url)
+            logger.info(f"found inline img for {url}: {img_url}")
             return download_image_to_bytes(img_url, timeout=timeout)
     except Exception:
+        logger.debug(f"fetch_candidate_thumbnail_bytes failed for {url}")
         return None
     return None
 
