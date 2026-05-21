@@ -8,6 +8,21 @@ import imagehash
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
 
+try:
+    from curl_cffi import requests as curl_requests
+except Exception:
+    curl_requests = None
+
+try:
+    from playwright.sync_api import sync_playwright
+except Exception:
+    sync_playwright = None
+
+try:
+    from playwright_stealth import Stealth
+except Exception:
+    Stealth = None
+
 # simple module logger
 logger = logging.getLogger("marketplace_real")
 if not logger.handlers:
@@ -25,12 +40,237 @@ COLOR_KEYWORDS = {
     (0, 0, 255): 'синий',
 }
 
+WB_HOME_URL = 'https://www.wildberries.ru/'
+WB_SEARCH_API_URL = 'https://search.wb.ru/exactmatch/ru/common/v5/search'
+WB_SEARCH_HTML_URL = 'https://www.wildberries.ru/catalog/0/search.aspx?search='
+WB_IMPERSONATE = os.environ.get('WB_IMPERSONATE', 'chrome120')
+WB_PROXY_URL = (
+    os.environ.get('WB_PROXY')
+    or os.environ.get('MARKETPLACE_PROXY')
+    or os.environ.get('HTTPS_PROXY')
+    or os.environ.get('HTTP_PROXY')
+)
+
+
+def get_proxy_config() -> dict[str, str] | None:
+    if not WB_PROXY_URL:
+        return None
+    return {'http': WB_PROXY_URL, 'https': WB_PROXY_URL}
+
+
+def create_http_session():
+    if curl_requests is not None:
+        try:
+            session = curl_requests.Session(impersonate=WB_IMPERSONATE)
+            proxy_config = get_proxy_config()
+            if proxy_config:
+                try:
+                    session.proxies = proxy_config
+                except Exception:
+                    pass
+            return session
+        except Exception:
+            pass
+    session = requests.Session()
+    proxy_config = get_proxy_config()
+    if proxy_config:
+        session.proxies.update(proxy_config)
+    return session
+
+
+def warm_wildberries_session(session, headers: dict[str, str]) -> None:
+    try:
+        session.get(WB_HOME_URL, headers=headers, timeout=10)
+    except Exception:
+        logger.debug('wildberries warmup failed')
+
+
+def normalize_wb_thumbnail(value: object) -> str | None:
+    if isinstance(value, str) and value:
+        if value.startswith('//'):
+            return 'https:' + value
+        if value.startswith('/'):
+            return WB_HOME_URL.rstrip('/') + value
+        return value
+    return None
+
+
+def fetch_wildberries_api_candidates(query: str) -> list[dict]:
+    headers = {
+        'User-Agent': os.environ.get('MARKETPLACE_USER_AGENT', 'Mozilla/5.0'),
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+        'Referer': WB_HOME_URL,
+        'X-Requested-With': 'XMLHttpRequest',
+    }
+    params = {
+        'ab_testing': 'false',
+        'appType': 1,
+        'curr': 'rub',
+        'dest': '-1257786',
+        'query': query,
+        'resultset': 'catalog',
+        'sort': 'popular',
+        'spp': 24,
+        'suppressSpellcheck': 'false',
+    }
+    session = create_http_session()
+    warm_wildberries_session(session, headers)
+    try:
+        response = session.get(
+            WB_SEARCH_API_URL,
+            params=params,
+            headers=headers,
+            timeout=15,
+        )
+        if getattr(response, 'status_code', None) != 200:
+            logger.warning(
+                f"WB API returned non-200: {getattr(response, 'status_code', None)} for query={query}"
+            )
+            return []
+        payload = response.json()
+        products = (
+            payload.get('data', {}).get('products')
+            or payload.get('products')
+            or []
+        )
+        items: List[Dict] = []
+        for product in products:
+            product_id = product.get('id') or product.get('nmId') or product.get('root')
+            if not product_id:
+                continue
+            brand = (product.get('brand') or '').strip()
+            name = (product.get('name') or product.get('title') or '').strip()
+            title = ' '.join(part for part in [brand, name] if part).strip()
+            if not title:
+                continue
+            items.append(
+                {
+                    'title': title,
+                    'url': f'https://www.wildberries.ru/catalog/{product_id}/detail.aspx',
+                    'marketplace': 'Wildberries',
+                    'thumbnail': normalize_wb_thumbnail(
+                        product.get('image')
+                        or product.get('img')
+                        or product.get('preview')
+                        or product.get('big'),
+                    ),
+                }
+            )
+            if len(items) >= 30:
+                break
+        logger.info(f'parsed {len(items)} WB API candidates for query={query}')
+        return items
+    except Exception as exc:
+        logger.exception(f'WB API fetch failed for query={query}: {exc}')
+        return []
+
+
+def fetch_wildberries_html_candidates(query: str) -> list[dict]:
+    headers = {
+        'User-Agent': os.environ.get('MARKETPLACE_USER_AGENT', 'Mozilla/5.0'),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+        'Referer': WB_HOME_URL,
+        'X-Requested-With': 'XMLHttpRequest',
+    }
+    session = create_http_session()
+    warm_wildberries_session(session, headers)
+    url = WB_SEARCH_HTML_URL + requests.utils.requote_uri(query)
+    try:
+        response = session.get(url, headers=headers, timeout=15)
+        if getattr(response, 'status_code', None) != 200:
+            logger.warning(
+                f"WB HTML returned non-200: {getattr(response, 'status_code', None)} for query={query}"
+            )
+            return []
+        soup = BeautifulSoup(response.text, 'lxml')
+        items: List[Dict] = []
+        for anchor in soup.find_all('a', href=True):
+            href = anchor['href']
+            if '/catalog/' not in href:
+                continue
+            title = (anchor.get('aria-label') or anchor.get_text() or '').strip()
+            img = anchor.find('img')
+            thumbnail = None
+            if img:
+                thumbnail = normalize_wb_thumbnail(
+                    img.get('data-src') or img.get('src') or img.get('data-original')
+                )
+            if href.startswith('/'):
+                href = f'https://www.wildberries.ru{href}'
+            if not title and img and img.get('alt'):
+                title = (img.get('alt') or '').strip()
+            if not title:
+                continue
+            items.append(
+                {
+                    'title': title,
+                    'url': href,
+                    'marketplace': 'Wildberries',
+                    'thumbnail': thumbnail,
+                }
+            )
+            if len(items) >= 30:
+                break
+        logger.info(f'parsed {len(items)} WB HTML candidates for query={query}')
+        return items
+    except Exception as exc:
+        logger.exception(f'WB HTML fetch failed for query={query}: {exc}')
+        return []
+
+
+def fetch_wildberries_playwright_candidates(query: str) -> list[dict]:
+    if sync_playwright is None:
+        logger.info('Playwright is not installed; skipping WB browser fallback')
+        return []
+
+    headers = {
+        'User-Agent': os.environ.get('MARKETPLACE_USER_AGENT', 'Mozilla/5.0'),
+        'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+    }
+    search_url = WB_SEARCH_HTML_URL + requests.utils.requote_uri(query)
+    try:
+        with sync_playwright() as p:
+            proxy_settings = {'server': WB_PROXY_URL} if WB_PROXY_URL else None
+            browser = p.chromium.launch(
+                headless=True,
+                args=['--disable-blink-features=AutomationControlled'],
+                proxy=proxy_settings,
+            )
+            context = browser.new_context(
+                user_agent=headers['User-Agent'],
+                locale='ru-RU',
+                viewport={'width': 1440, 'height': 900},
+            )
+            page = context.new_page()
+            if Stealth is not None:
+                try:
+                    Stealth(navigator_languages_override=('ru-RU', 'ru'), navigator_platform_override='Win32').apply_stealth_sync(page)
+                except Exception:
+                    logger.debug('playwright stealth setup failed')
+            page.goto(WB_HOME_URL, wait_until='domcontentloaded', timeout=30000)
+            page.goto(search_url, wait_until='domcontentloaded', timeout=30000)
+            try:
+                page.wait_for_load_state('networkidle', timeout=15000)
+            except Exception:
+                pass
+            html = page.content()
+            browser.close()
+        items = parse_wildberries(html, 'wildberries.ru')
+        logger.info(f'parsed {len(items)} WB Playwright candidates for query={query}')
+        return items
+    except Exception as exc:
+        logger.exception(f'WB Playwright fetch failed for query={query}: {exc}')
+        return []
+
 
 def download_image_to_bytes(url: str, timeout: int = 8) -> bytes | None:
     try:
         ua = os.environ.get('MARKETPLACE_USER_AGENT', 'Mozilla/5.0')
         headers = {'User-Agent': ua}
-        r = requests.get(url, headers=headers, timeout=timeout)
+        session = create_http_session()
+        r = session.get(url, headers=headers, timeout=timeout)
         r.raise_for_status()
         return r.content
     except Exception:
@@ -125,72 +365,18 @@ def parse_wildberries(html: str, domain_hint: str) -> list[dict]:
     return items
 
 
-def parse_ozon(html: str, domain_hint: str) -> list[dict]:
-    soup = BeautifulSoup(html, 'lxml')
-    items: List[Dict] = []
-    # Ozon often uses links containing '/product/' or '/context/detail'
-    for a in soup.find_all('a', href=True):
-        href = a['href']
-        if not any(k in href for k in ['/product/', '/context/detail', '/seller/']):
-            continue
-        title = (a.get_text() or '').strip()
-        img = a.find('img')
-        thumb = None
-        if img:
-            thumb = img.get('src') or img.get('data-src')
-            if thumb and thumb.startswith('//'):
-                thumb = 'https:' + thumb
-        if href.startswith('/'):
-            href = f'https://{domain_hint}{href}'
-        if not title and img and img.get('alt'):
-            title = img.get('alt')
-        if not title:
-            continue
-        items.append({'title': title, 'url': href, 'marketplace': 'Ozon', 'thumbnail': thumb})
-        if len(items) >= 30:
-            break
-    return items
-
-
 def fetch_marketplace_candidates(query: str) -> list[dict]:
-    headers = {
-        'User-Agent': os.environ.get('MARKETPLACE_USER_AGENT', 'Mozilla/5.0')
-    }
-    candidates: List[Dict] = []
-    try:
-        encoded = requests.utils.requote_uri(query)
-        wb = 'https://www.wildberries.ru/catalog/0/search.aspx?search='
-        oz = 'https://www.ozon.ru/search/?from_global=true&text='
-        ya = 'https://market.yandex.ru/search?text='
-        endpoints = [
-            (wb + encoded, 'wildberries.ru'),
-            (oz + encoded, 'ozon.ru'),
-            (ya + encoded, 'market.yandex.ru'),
-        ]
-        for url, domain in endpoints:
-            try:
-                logger.info(f"fetching search page: {url}")
-                r = requests.get(url, headers=headers, timeout=6)
-                status = getattr(r, 'status_code', None)
-                if status != 200:
-                    logger.warning(f"non-200 from {domain}: {status} for query={query}")
-                    continue
-                # Use site-specific parsers when available
-                if 'wildberries' in domain:
-                    parsed = parse_wildberries(r.text, domain)
-                elif 'ozon' in domain:
-                    parsed = parse_ozon(r.text, domain)
-                else:
-                    parsed = parse_search_results_from_html(r.text, domain)
-                logger.info(f"parsed {len(parsed)} candidates from {domain}")
-                for p in parsed:
-                    candidates.append(p)
-            except Exception as e:
-                logger.exception(f"error fetching/parsing {domain} for query={query}: {e}")
-                continue
-    except Exception:
-        pass
-    return candidates
+    # WB-only cascade: API first, then HTML search page as fallback.
+    # Other marketplaces are intentionally not queried in this version.
+    candidates = fetch_wildberries_api_candidates(query)
+    if candidates:
+        return candidates
+
+    candidates = fetch_wildberries_html_candidates(query)
+    if candidates:
+        return candidates
+
+    return fetch_wildberries_playwright_candidates(query)
 
 
 def simple_score_candidate(candidate: dict, query_tokens: list[str]) -> float:
@@ -216,7 +402,8 @@ def fetch_candidate_thumbnail_bytes(url: str, timeout: int = 3):
     try:
         ua = os.environ.get('MARKETPLACE_USER_AGENT', 'Mozilla/5.0')
         headers = {'User-Agent': ua}
-        r = requests.get(url, headers=headers, timeout=timeout)
+        session = create_http_session()
+        r = session.get(url, headers=headers, timeout=timeout)
         r.raise_for_status()
         soup = BeautifulSoup(r.text, 'lxml')
         # First try og:image
@@ -275,12 +462,16 @@ def real_search_by_image(
     seen_urls = set()
     for q in queries:
         cand = fetch_marketplace_candidates(q)
+        if cand:
+            logger.info(f"stopping query cascade after hit on query={q}")
         for c in cand:
             u = c.get('url')
             if not u or u in seen_urls:
                 continue
             seen_urls.add(u)
             all_candidates.append(c)
+        if all_candidates:
+            break
 
     tokens = (query or '').split() + colors
     for c in all_candidates:
