@@ -453,10 +453,20 @@ def marketplace_search_by_image(
         " ".join(part for part in seed_parts if part).strip() or "стильная одежда"
     )
     results = build_marketplace_stub_results(seed_query)[:10]
+    # Ensure stub results include scoring fields for consistent frontend handling
+    normalized = []
+    for r in results:
+        item = dict(r)
+        item.setdefault('text_score', None)
+        item.setdefault('visual_score', None)
+        item.setdefault('score', None)
+        item.setdefault('thumbnail', None)
+        normalized.append(item)
+
     return {
-        "results": results,
+        "results": normalized,
         "source": "stub",
-        "count": len(results),
+        "count": len(normalized),
     }
 
 

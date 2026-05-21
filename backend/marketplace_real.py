@@ -87,6 +87,60 @@ def parse_search_results_from_html(html: str, domain_hint: str) -> list[dict]:
     return items
 
 
+def parse_wildberries(html: str, domain_hint: str) -> list[dict]:
+    soup = BeautifulSoup(html, 'lxml')
+    items: List[Dict] = []
+    # Try common Wildberries patterns: links with /catalog/ and image inside
+    for a in soup.find_all('a', href=True):
+        href = a['href']
+        if '/catalog/' not in href:
+            continue
+        title = a.get('aria-label') or (a.get_text() or '').strip()
+        img = a.find('img')
+        thumb = None
+        if img:
+            thumb = img.get('data-src') or img.get('src') or img.get('data-original')
+            if thumb and thumb.startswith('//'):
+                thumb = 'https:' + thumb
+        if href.startswith('/'):
+            href = f'https://{domain_hint}{href}'
+        if not title and img and img.get('alt'):
+            title = img.get('alt')
+        if not title:
+            continue
+        items.append({'title': title.strip(), 'url': href, 'marketplace': 'Wildberries', 'thumbnail': thumb})
+        if len(items) >= 30:
+            break
+    return items
+
+
+def parse_ozon(html: str, domain_hint: str) -> list[dict]:
+    soup = BeautifulSoup(html, 'lxml')
+    items: List[Dict] = []
+    # Ozon often uses links containing '/product/' or '/context/detail'
+    for a in soup.find_all('a', href=True):
+        href = a['href']
+        if not any(k in href for k in ['/product/', '/context/detail', '/seller/']):
+            continue
+        title = (a.get_text() or '').strip()
+        img = a.find('img')
+        thumb = None
+        if img:
+            thumb = img.get('src') or img.get('data-src')
+            if thumb and thumb.startswith('//'):
+                thumb = 'https:' + thumb
+        if href.startswith('/'):
+            href = f'https://{domain_hint}{href}'
+        if not title and img and img.get('alt'):
+            title = img.get('alt')
+        if not title:
+            continue
+        items.append({'title': title, 'url': href, 'marketplace': 'Ozon', 'thumbnail': thumb})
+        if len(items) >= 30:
+            break
+    return items
+
+
 def fetch_marketplace_candidates(query: str) -> list[dict]:
     headers = {
         'User-Agent': os.environ.get('MARKETPLACE_USER_AGENT', 'Mozilla/5.0')
@@ -107,7 +161,13 @@ def fetch_marketplace_candidates(query: str) -> list[dict]:
                 r = requests.get(url, headers=headers, timeout=6)
                 if r.status_code != 200:
                     continue
-                parsed = parse_search_results_from_html(r.text, domain)
+                # Use site-specific parsers when available
+                if 'wildberries' in domain:
+                    parsed = parse_wildberries(r.text, domain)
+                elif 'ozon' in domain:
+                    parsed = parse_ozon(r.text, domain)
+                else:
+                    parsed = parse_search_results_from_html(r.text, domain)
                 for p in parsed:
                     candidates.append(p)
             except Exception:
