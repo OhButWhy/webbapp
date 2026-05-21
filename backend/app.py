@@ -428,6 +428,19 @@ def health() -> dict[str, str]:
 def marketplace_search_by_image(
     payload: MarketplaceSearchPayload,
 ) -> dict[str, Any]:
+    # if real pipeline enabled via env var, try to run it
+    try:
+        if os.environ.get('REAL_MARKETPLACE_ENABLED', '0') == '1':
+            from .marketplace_real import real_search_by_image
+
+            results = real_search_by_image(
+                payload.imageUrl, payload.imagePath, payload.query, max_results=10
+            )
+            return {"results": results, "source": "real", "count": len(results)}
+    except Exception:
+        # fall through to stub on any unexpected error
+        pass
+
     seed_parts: list[str] = []
     if payload.query:
         seed_parts.append(payload.query.strip())

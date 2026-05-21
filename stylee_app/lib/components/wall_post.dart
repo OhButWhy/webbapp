@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:stylee_app/components/favorite_post_button.dart';
+import 'package:stylee_app/components/marketplace_search_button.dart';
+import 'package:stylee_app/components/marketplace_search_launcher.dart';
 import 'package:stylee_app/components/like_button.dart';
 
 class WallPost extends StatefulWidget {
@@ -118,6 +120,18 @@ class _WallPostState extends State<WallPost> {
               ),
               const SizedBox(height: 10),
               FavoritePostButton(imageUrl: widget.imageUrl),
+              const SizedBox(height: 10),
+              MarketplaceSearchButton(
+                size: 40,
+                onTap: () {
+                  openMarketplaceSearch(
+                    context,
+                    imageUrl: widget.imageUrl,
+                    queryHint: widget.message,
+                    requireImage: true,
+                  );
+                },
+              ),
             ],
           )
         ],

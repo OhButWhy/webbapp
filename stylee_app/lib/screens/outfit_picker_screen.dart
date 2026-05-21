@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:stylee_app/components/marketplace_search_button.dart';
+import 'package:stylee_app/components/marketplace_search_launcher.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
 import '../models/outfit.dart';
 import '../models/outfit_list.dart';
@@ -149,7 +151,43 @@ class _OutfitPickerScreenState extends State<OutfitPickerScreen> {
                                     leading: SizedBox(
                                       width: 56,
                                       height: 56,
-                                      child: Image.network(outfit.imageUrl, fit: BoxFit.cover),
+                                      child: Stack(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Container(
+                                              color: Colors.grey.shade200,
+                                              child: outfit.imageUrl.isEmpty
+                                                  ? const Center(child: Icon(Icons.image_not_supported, size: 22, color: Colors.grey))
+                                                  : Image.network(
+                                                      outfit.imageUrl,
+                                                      fit: BoxFit.cover,
+                                                      width: 56,
+                                                      height: 56,
+                                                      errorBuilder: (_, __, ___) => const Center(
+                                                        child: Icon(Icons.broken_image_outlined, size: 22, color: Colors.grey),
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),
+                                          if (outfit.imageUrl.isNotEmpty)
+                                            Positioned(
+                                              right: 2,
+                                              top: 2,
+                                              child: MarketplaceSearchButton(
+                                                size: 20,
+                                                onTap: () {
+                                                  openMarketplaceSearch(
+                                                    context,
+                                                    imageUrl: outfit.imageUrl,
+                                                    queryHint: outfit.title,
+                                                    requireImage: true,
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                     title: Text(outfit.title),
                                     subtitle: Text('Стили: ${outfit.styles.join(", ")}'),

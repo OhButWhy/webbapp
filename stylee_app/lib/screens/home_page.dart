@@ -4,11 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:stylee_app/components/marketplace_search_button.dart';
+import 'package:stylee_app/components/marketplace_search_launcher.dart';
 import 'package:stylee_app/components/drawer.dart';
 import 'package:stylee_app/screens/chat_page.dart';
 import 'package:stylee_app/screens/editor_page.dart';
 import 'package:stylee_app/screens/edit_profile_page.dart';
-import 'package:stylee_app/screens/marketplace_search_screen.dart';
 import 'package:stylee_app/screens/profile_page.dart';
 import 'package:stylee_app/screens/wardrobe_page.dart';
 
@@ -401,8 +401,12 @@ class _HomePageState extends State<HomePage> {
                     MarketplaceSearchButton(
                       size: 44,
                       onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => MarketplaceSearchScreen(imageUrl: imageUrl, imagePath: imageUrl, queryHint: caption.toString())),
+                        openMarketplaceSearch(
+                          context,
+                          imageUrl: imageUrl,
+                          imagePath: imageUrl,
+                          queryHint: caption?.toString(),
+                          requireImage: true,
                         );
                       },
                     ),

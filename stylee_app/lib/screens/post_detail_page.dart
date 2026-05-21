@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:stylee_app/components/marketplace_search_button.dart';
+import 'package:stylee_app/components/marketplace_search_launcher.dart';
 
 class PostDetailPage extends StatefulWidget {
   final List<Map<String, dynamic>> posts;
@@ -283,16 +285,38 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   // 2. Изображение
                   AspectRatio(
                     aspectRatio: 1,
-                    child: imageUrl != null && imageUrl.isNotEmpty && File(imageUrl).existsSync()
-                        ? Image.file(
-                            File(imageUrl),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                          )
-                        : Container(
-                            color: Colors.grey.shade200,
-                            child: const Center(child: Icon(Icons.image_not_supported, size: 50)),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: imageUrl != null && imageUrl.isNotEmpty && File(imageUrl).existsSync()
+                              ? Image.file(
+                                  File(imageUrl),
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                )
+                              : Container(
+                                  color: Colors.grey.shade200,
+                                  child: const Center(child: Icon(Icons.image_not_supported, size: 50)),
+                                ),
+                        ),
+                        if (imageUrl != null && imageUrl.isNotEmpty && File(imageUrl).existsSync())
+                          Positioned(
+                            right: 12,
+                            top: 12,
+                            child: MarketplaceSearchButton(
+                              size: 36,
+                              onTap: () {
+                                openMarketplaceSearch(
+                                  context,
+                                  imagePath: imageUrl,
+                                  queryHint: caption,
+                                  requireImage: true,
+                                );
+                              },
+                            ),
                           ),
+                      ],
+                    ),
                   ),
 
                   // 3. Кнопки действий
