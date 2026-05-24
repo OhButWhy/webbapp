@@ -1,5 +1,8 @@
 import logging
+import json
 import os
+import random
+import time
 import requests
 from bs4 import BeautifulSoup
 from PIL import Image
@@ -7,6 +10,7 @@ from io import BytesIO
 import imagehash
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict
+from pathlib import Path
 
 try:
     from curl_cffi import requests as curl_requests
@@ -44,12 +48,20 @@ WB_HOME_URL = 'https://www.wildberries.ru/'
 WB_SEARCH_API_URL = 'https://search.wb.ru/exactmatch/ru/common/v5/search'
 WB_SEARCH_HTML_URL = 'https://www.wildberries.ru/catalog/0/search.aspx?search='
 WB_IMPERSONATE = os.environ.get('WB_IMPERSONATE', 'chrome120')
+WB_REQUEST_RETRIES = int(os.environ.get('WB_REQUEST_RETRIES', '3'))
+WB_RETRY_BASE_DELAY = float(os.environ.get('WB_RETRY_BASE_DELAY', '1.3'))
+WB_RETRY_JITTER_MAX = float(os.environ.get('WB_RETRY_JITTER_MAX', '0.6'))
+CACHE_MAX_RESULTS = int(os.environ.get('REAL_MARKETPLACE_CACHE_MAX_RESULTS', '30'))
 WB_PROXY_URL = (
     os.environ.get('WB_PROXY')
     or os.environ.get('MARKETPLACE_PROXY')
     or os.environ.get('HTTPS_PROXY')
     or os.environ.get('HTTP_PROXY')
 )
+
+ROOT_DIR = Path(__file__).resolve().parent
+DATA_DIR = ROOT_DIR / 'data'
+CACHE_FILE = DATA_DIR / 'marketplace_real_cache.json'
 
 
 def get_proxy_config() -> dict[str, str] | None:
@@ -76,6 +88,77 @@ def create_http_session():
     if proxy_config:
         session.proxies.update(proxy_config)
     return session
+
+
+def normalize_query_key(query: str | None) -> str:
+    return (query or '').strip().lower() or 'default'
+
+
+def load_cache() -> dict:
+    try:
+        if not CACHE_FILE.exists():
+            return {'queries': {}, 'last_success': []}
+        with open(CACHE_FILE, 'r', encoding='utf-8') as fh:
+            payload = json.load(fh)
+            if isinstance(payload, dict):
+                payload.setdefault('queries', {})
+                payload.setdefault('last_success', [])
+                return payload
+    except Exception:
+        logger.debug('failed to read marketplace cache')
+    return {'queries': {}, 'last_success': []}
+
+
+def save_cache(payload: dict) -> None:
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(CACHE_FILE, 'w', encoding='utf-8') as fh:
+            json.dump(payload, fh, ensure_ascii=False, indent=2)
+    except Exception:
+        logger.debug('failed to write marketplace cache')
+
+
+def read_cached_results(query: str | None, max_results: int) -> list[dict]:
+    payload = load_cache()
+    key = normalize_query_key(query)
+    candidates = payload.get('queries', {}).get(key) or payload.get('last_success') or []
+    if not isinstance(candidates, list):
+        return []
+    return candidates[:max_results]
+
+
+def store_cached_results(query: str | None, results: list[dict]) -> None:
+    if not results:
+        return
+    payload = load_cache()
+    key = normalize_query_key(query)
+    clipped = results[:CACHE_MAX_RESULTS]
+    payload['queries'][key] = clipped
+    payload['last_success'] = clipped
+    save_cache(payload)
+
+
+def request_with_retries(session, url: str, *, headers: dict, timeout: int, params: dict | None = None):
+    last_response = None
+    for attempt in range(1, WB_REQUEST_RETRIES + 1):
+        try:
+            response = session.get(url, headers=headers, timeout=timeout, params=params)
+            last_response = response
+            status = getattr(response, 'status_code', None)
+            if status == 200:
+                return response
+            if status not in (403, 429, 498):
+                return response
+            delay = (WB_RETRY_BASE_DELAY ** attempt) + random.uniform(0.0, WB_RETRY_JITTER_MAX)
+            logger.warning(f'WB retryable status={status} attempt={attempt}/{WB_REQUEST_RETRIES}, sleep={delay:.2f}s')
+            time.sleep(delay)
+        except Exception as exc:
+            if attempt >= WB_REQUEST_RETRIES:
+                raise
+            delay = (WB_RETRY_BASE_DELAY ** attempt) + random.uniform(0.0, WB_RETRY_JITTER_MAX)
+            logger.warning(f'WB request error attempt={attempt}/{WB_REQUEST_RETRIES}: {exc}; sleep={delay:.2f}s')
+            time.sleep(delay)
+    return last_response
 
 
 def warm_wildberries_session(session, headers: dict[str, str]) -> None:
@@ -117,11 +200,12 @@ def fetch_wildberries_api_candidates(query: str) -> list[dict]:
     session = create_http_session()
     warm_wildberries_session(session, headers)
     try:
-        response = session.get(
+        response = request_with_retries(
+            session,
             WB_SEARCH_API_URL,
-            params=params,
             headers=headers,
             timeout=15,
+            params=params,
         )
         if getattr(response, 'status_code', None) != 200:
             logger.warning(
@@ -178,7 +262,7 @@ def fetch_wildberries_html_candidates(query: str) -> list[dict]:
     warm_wildberries_session(session, headers)
     url = WB_SEARCH_HTML_URL + requests.utils.requote_uri(query)
     try:
-        response = session.get(url, headers=headers, timeout=15)
+        response = request_with_retries(session, url, headers=headers, timeout=15)
         if getattr(response, 'status_code', None) != 200:
             logger.warning(
                 f"WB HTML returned non-200: {getattr(response, 'status_code', None)} for query={query}"
@@ -398,7 +482,7 @@ def compute_phash_from_bytes(image_bytes: bytes) -> imagehash.ImageHash | None:
         return None
 
 
-def fetch_candidate_thumbnail_bytes(url: str, timeout: int = 3):
+def fetch_candidate_thumbnail_info(url: str, timeout: int = 3):
     try:
         ua = os.environ.get('MARKETPLACE_USER_AGENT', 'Mozilla/5.0')
         headers = {'User-Agent': ua}
@@ -411,7 +495,7 @@ def fetch_candidate_thumbnail_bytes(url: str, timeout: int = 3):
         if meta and meta.get('content'):
             img_url = meta.get('content')
             logger.info(f"found og:image for {url}: {img_url}")
-            return download_image_to_bytes(img_url, timeout=timeout)
+            return download_image_to_bytes(img_url, timeout=timeout), img_url
         # fallback: first image tag
         img = soup.find('img')
         if img and img.get('src'):
@@ -423,11 +507,11 @@ def fetch_candidate_thumbnail_bytes(url: str, timeout: int = 3):
 
                 img_url = urljoin(url, img_url)
             logger.info(f"found inline img for {url}: {img_url}")
-            return download_image_to_bytes(img_url, timeout=timeout)
+            return download_image_to_bytes(img_url, timeout=timeout), img_url
     except Exception:
         logger.debug(f"fetch_candidate_thumbnail_bytes failed for {url}")
-        return None
-    return None
+        return None, None
+    return None, None
 
 
 def visual_similarity_score(phash_a, phash_b) -> float:
@@ -473,6 +557,13 @@ def real_search_by_image(
         if all_candidates:
             break
 
+    if not all_candidates:
+        cached = read_cached_results(query, max_results)
+        if cached:
+            logger.info('using cached real marketplace results')
+            return cached
+        return []
+
     tokens = (query or '').split() + colors
     for c in all_candidates:
         c['text_score'] = simple_score_candidate(c, tokens)
@@ -487,17 +578,21 @@ def real_search_by_image(
 
     # download thumbnails in parallel
     thumbnail_map: Dict[str, bytes | None] = {}
+    thumbnail_url_map: Dict[str, str | None] = {}
     with ThreadPoolExecutor(max_workers=6) as ex:
         future_to_cand = {}
         for c in candidates_for_visual:
-            f = ex.submit(fetch_candidate_thumbnail_bytes, c.get('url'))
+            f = ex.submit(fetch_candidate_thumbnail_info, c.get('url'))
             future_to_cand[f] = c
         for fut in as_completed(future_to_cand):
             cand = future_to_cand[fut]
             try:
-                thumbnail_map[cand.get('url')] = fut.result()
+                img_bytes, img_url = fut.result()
+                thumbnail_map[cand.get('url')] = img_bytes
+                thumbnail_url_map[cand.get('url')] = img_url
             except Exception:
                 thumbnail_map[cand.get('url')] = None
+                thumbnail_url_map[cand.get('url')] = None
 
     # compute visual scores and combine
     text_scores = [c.get('text_score', 0.0) for c in all_candidates]
@@ -506,6 +601,8 @@ def real_search_by_image(
 
     for c in all_candidates:
         img_bytes = thumbnail_map.get(c.get('url'))
+        if not c.get('thumbnail') and thumbnail_url_map.get(c.get('url')):
+            c['thumbnail'] = thumbnail_url_map.get(c.get('url'))
         visual_score = 0.0
         if query_phash and img_bytes:
             ph = compute_phash_from_bytes(img_bytes)
@@ -517,4 +614,6 @@ def real_search_by_image(
         c['score'] = round(combined, 3)
 
     all_candidates.sort(key=lambda x: x.get('score', 0.0), reverse=True)
-    return all_candidates[:max_results]
+    top = all_candidates[:max_results]
+    store_cached_results(query, top)
+    return top

@@ -364,18 +364,27 @@ def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
         },
         {
             "title": "Блейзер прямого кроя",
-            "marketplace": "Ozon",
-            "url": f"https://www.ozon.ru/search/?text={encoded}",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+блейзер"
+            ),
         },
         {
             "title": "Джинсы wide-leg",
-            "marketplace": "Lamoda",
-            "url": f"https://www.lamoda.ru/catalogsearch/result/?q={encoded}",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+джинсы"
+            ),
         },
         {
             "title": "Рубашка oversize",
-            "marketplace": "Яндекс Маркет",
-            "url": f"https://market.yandex.ru/search?text={encoded}",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+рубашка"
+            ),
         },
         {
             "title": "Тренч классический",
@@ -387,21 +396,27 @@ def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
         },
         {
             "title": "Юбка плиссе",
-            "marketplace": "Ozon",
-            "url": f"https://www.ozon.ru/search/?text={encoded}+юбка",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+юбка"
+            ),
         },
         {
             "title": "Кроссовки минималистичные",
-            "marketplace": "Lamoda",
+            "marketplace": "Wildberries",
             "url": (
-                "https://www.lamoda.ru/catalogsearch/result/?q="
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
                 f"{encoded}+кроссовки"
             ),
         },
         {
             "title": "Сумка через плечо",
-            "marketplace": "Яндекс Маркет",
-            "url": f"https://market.yandex.ru/search?text={encoded}+сумка",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+сумка"
+            ),
         },
         {
             "title": "Пальто демисезонное",
@@ -413,8 +428,11 @@ def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
         },
         {
             "title": "Аксессуары к образу",
-            "marketplace": "Ozon",
-            "url": f"https://www.ozon.ru/search/?text={encoded}+аксессуары",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+аксессуары"
+            ),
         },
     ]
 
