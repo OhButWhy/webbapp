@@ -308,43 +308,6 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                             const SizedBox(width: 8),
                             GestureDetector(
-  Widget _buildHighlight(String label) {
-    return Column(
-      children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFFE91E63), Color(0xFFF48FB1)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.pink.withOpacity(0.18),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.favorite_border, color: Colors.white, size: 28),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: 84,
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-        ),
-      ],
-    );
-  }
                               onTap: () async {
                                 final result = await Navigator.push(
                                   context,
@@ -488,3 +451,49 @@ class _ProfilePageState extends State<ProfilePage> {
                   SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).size.height * 0.5, child: Center(child: Text('Репосты пока отсутствуют'))))
                 else
                   SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).size.height * 0.5, child: Center(child: Text('Гардероб пуст')))),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHighlight(String label) {
+    return Column(
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFFE91E63), Color(0xFFF48FB1)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.pink.withOpacity(0.18),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.favorite_border, color: Colors.white, size: 28),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: 84,
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+}
