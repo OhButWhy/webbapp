@@ -34,11 +34,11 @@ class _QuizWizardState extends State<QuizWizard> {
         'waist': widget.existingResult?.waist,
         'hips': widget.existingResult?.hips,
         'city': widget.existingResult?.city,
-        'styles': widget.existingResult?.preferredStyles,
-        'favorite_colors': widget.existingResult?.favoriteColors,
-        'avoided_colors': widget.existingResult?.avoidedColors,
-        'fit': widget.existingResult?.fitPreference,
-        'specialNotes': widget.existingResult?.specialNotes,
+      'styles': widget.existingResult?.preferredStyles ?? <String>[],
+      'favorite_colors': widget.existingResult?.favoriteColors ?? <String>[],
+      'avoided_colors': widget.existingResult?.avoidedColors ?? <String>[],
+      'fit': widget.existingResult?.fitPreference ?? '',
+      'special_notes': widget.existingResult?.specialNotes ?? '',
       };
     }
   }
@@ -58,11 +58,11 @@ class _QuizWizardState extends State<QuizWizard> {
       waist: _answers['waist'] != null ? double.tryParse(_answers['waist'].toString()) : null,
       hips: _answers['hips'] != null ? double.tryParse(_answers['hips'].toString()) : null,
       city: _answers['city'] as String?,
-      preferredStyles: _answers['styles'] is List ? List<String>.from(_answers['styles']!) : <String>[],
-      favoriteColors: _answers['favorite_colors'] is List ? List<String>.from(_answers['favorite_colors']!) : <String>[],
-      avoidedColors: _answers['avoided_colors'] is List ? List<String>.from(_answers['avoided_colors']!) : <String>[],
+      preferredStyles: _answers['styles'] is List ? List<String>.from(_answers['styles'] as List) : <String>[],
+      favoriteColors: _answers['favorite_colors'] is List ? List<String>.from(_answers['favorite_colors'] as List) : <String>[],
+      avoidedColors: _answers['avoided_colors'] is List ? List<String>.from(_answers['avoided_colors'] as List) : <String>[],
       fitPreference: _answers['fit'] as String?,
-      specialNotes: _answers['specialNotes'] as String?,
+      specialNotes: _answers['special_notes'] as String?,
     );
     widget.onComplete(result);
   }

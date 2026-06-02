@@ -1,17 +1,15 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:stylee_app/components/marketplace_search_button.dart';
+import 'package:stylee_app/components/marketplace_search_launcher.dart';
 import 'package:stylee_app/components/drawer.dart';
 import 'package:stylee_app/screens/chat_page.dart';
 import 'package:stylee_app/screens/editor_page.dart';
-import 'package:stylee_app/screens/edit_profile_page.dart';
-import 'package:stylee_app/screens/marketplace_search_screen.dart';
 import 'package:stylee_app/screens/profile_page.dart';
 import 'package:stylee_app/screens/wardrobe_page.dart';
+import 'package:stylee_app/utils/image_provider_from_path.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,8 +31,6 @@ class _HomePageState extends State<HomePage> {
   final List<String> _colorOptions = ['чёрный', 'белый', 'красный', 'синий', 'серый', 'голубой'];
 
   final Map<String, Map<String, dynamic>> _usersCache = {};
-  bool _debugMode = false;
-  bool _forceDemoFeed = false;
 
   void _onBottomNavTap(int index) {
     setState(() => _selectedIndex = index);
@@ -71,80 +67,6 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       print('Error toggling like in feed: $e');
     }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _debugMode = Uri.base.queryParameters['debug'] == '1';
-    _forceDemoFeed = Uri.base.queryParameters['demoFeed'] == '1';
-  }
-
-  Widget _placeholderImageWidget() {
-    return Container(
-      color: Colors.grey.shade900,
-      child: const Center(
-        child: Icon(Icons.image_not_supported, size: 72, color: Colors.white24),
-      ),
-    );
-  }
-
-  bool _isDisplayableNetworkLikeUrl(String url) {
-    return url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:');
-  }
-
-  // Demo posts for the public demo build when Firestore has no posts or writes are disabled
-  final List<Map<String, String>> _demoPosts = [
-    {'imageUrl': '', 'caption': 'Демо: лёгкий образ для прогулки'},
-    {'imageUrl': '', 'caption': 'Демо: повседневный базовый look'},
-    {'imageUrl': '', 'caption': 'Демо: вечерний образ'},
-  ];
-
-  Widget _buildDemoPostItem(int index) {
-    final data = _demoPosts[index];
-    final caption = data['caption'] ?? '';
-    final likesCount = 0;
-
-    return Stack(
-      children: [
-        Container(color: Colors.grey.shade900),
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.3), Colors.transparent, Colors.black.withOpacity(0.8)]),
-            ),
-          ),
-        ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildSideAction(icon: Icons.favorite_border, color: Colors.white, size: 32, onTap: () { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Лайк (демо)'))); }),
-                const SizedBox(height: 4),
-                Text(likesCount.toString(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-                const SizedBox(height: 20),
-                _buildSideAction(icon: Icons.chat_bubble_outline, color: Colors.white, size: 32),
-                const SizedBox(height: 4),
-                const Text("0", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
-              ],
-            ),
-          ),
-        ),
-        Positioned(
-          left: 12, right: 80, bottom: 24,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('@demo_user', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              if (caption.isNotEmpty) ...[const SizedBox(height: 8), Text(caption, style: const TextStyle(color: Colors.white, fontSize: 14))],
-            ],
-          ),
-        ),
-      ],
-    );
   }
 
   bool get _hasActiveFeedFilters =>
@@ -272,70 +194,44 @@ class _HomePageState extends State<HomePage> {
     }
 
     final isFeed = _selectedIndex == 0;
-    // If demo feed is forced, bypass Firestore stream entirely and show stable demo feed.
-    if (isFeed && _forceDemoFeed) {
-      currentPage = _buildDemoFeedPage();
-    }
-    return WillPopScope(
-      onWillPop: () async {
-        if (_selectedIndex != 0) {
-          setState(() => _selectedIndex = 0);
-          return false;
-        }
-        return true;
-      },
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: isFeed ? Brightness.light : Brightness.dark,
-        ),
-        child: Scaffold(
-          backgroundColor: isFeed ? Colors.black : const Color(0xFFF5E6E8),
-          body: currentPage,
-
-          // 🔥 Скрываем меню только на вкладке Editor
-          bottomNavigationBar: _selectedIndex == 2
-              ? null
-              : Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -2))],
-                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-                  ),
-                  child: BottomNavigationBar(
-                    currentIndex: _selectedIndex,
-                    onTap: _onBottomNavTap,
-                    type: BottomNavigationBarType.fixed,
-                    backgroundColor: Colors.transparent,
-                    elevation: 0,
-                    selectedItemColor: Colors.black87,
-                    unselectedItemColor: Colors.grey.shade600,
-                    selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                    unselectedLabelStyle: const TextStyle(fontSize: 11),
-                    items: [
-                      _buildNavItem(Icons.local_fire_department_outlined, 'Feed', 0),
-                      _buildNavItem(Icons.checkroom_outlined, 'Wardrobe', 1),
-                      _buildNavItem(Icons.auto_fix_high_outlined, 'Editor', 2),
-                      _buildNavItem(Icons.auto_awesome_outlined, 'AI Stylist', 3),
-                      _buildNavItem(Icons.person_outline, 'Profile', 4),
-                    ],
-                  ),
-                ),
-        ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isFeed ? Brightness.light : Brightness.dark,
       ),
-    );
-  }
-
-  Widget _buildDemoFeedPage() {
-    return Stack(
-      children: [
-        PageView.builder(
-          scrollDirection: Axis.vertical,
-          itemCount: _demoPosts.length,
-          itemBuilder: (context, index) => _buildDemoPostItem(index),
-        ),
-        _buildTopMenu(),
-      ],
+      child: Scaffold(
+        backgroundColor: isFeed ? Colors.black : const Color(0xFFF5E6E8),
+        body: currentPage,
+        
+        // 🔥 Скрываем меню только на вкладке Editor
+        bottomNavigationBar: _selectedIndex == 2 
+            ? null 
+            : Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -2))],
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+                ),
+                child: BottomNavigationBar(
+                  currentIndex: _selectedIndex,
+                  onTap: _onBottomNavTap,
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  selectedItemColor: Colors.black87,
+                  unselectedItemColor: Colors.grey.shade600,
+                  selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  unselectedLabelStyle: const TextStyle(fontSize: 11),
+                  items: [
+                    _buildNavItem(Icons.local_fire_department_outlined, 'Feed', 0),
+                    _buildNavItem(Icons.checkroom_outlined, 'Wardrobe', 1),
+                    _buildNavItem(Icons.auto_fix_high_outlined, 'Editor', 2),
+                    _buildNavItem(Icons.auto_awesome_outlined, 'AI Stylist', 3),
+                    _buildNavItem(Icons.person_outline, 'Profile', 4),
+                  ],
+                ),
+              ),
+      ),
     );
   }
 
@@ -361,20 +257,19 @@ class _HomePageState extends State<HomePage> {
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance.collection('posts').orderBy('createdAt', descending: true).snapshots(),
           builder: (context, snapshot) {
-            if (_forceDemoFeed) {
-              return PageView.builder(
-                scrollDirection: Axis.vertical,
-                itemCount: _demoPosts.length,
-                itemBuilder: (context, index) => _buildDemoPostItem(index),
-              );
-            }
             if (snapshot.hasError) return Center(child: Text('Ошибка: ${snapshot.error}', style: const TextStyle(color: Colors.white)));
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              // Show a small demo feed so reviewers can scroll and interact without Firestore posts
-              return PageView.builder(
-                scrollDirection: Axis.vertical,
-                itemCount: _demoPosts.length,
-                itemBuilder: (context, index) => _buildDemoPostItem(index),
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.local_fire_department_outlined, size: 80, color: Colors.pink.shade300),
+                    const SizedBox(height: 24),
+                    const Text('Лента пуста', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Text('Создайте первый пост ✨', style: TextStyle(color: Colors.grey.shade400)),
+                  ],
+                ),
               );
             }
 
@@ -433,32 +328,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _wrapWithDebug(Widget child, AsyncSnapshot<QuerySnapshot> snapshot) {
-    if (!_debugMode) return child;
-    final docsCount = snapshot.data?.docs.length ?? 0;
-    final sample = docsCount > 0 ? snapshot.data!.docs.first.data().toString() : '';
-    return Stack(
-      children: [
-        child,
-        Positioned(
-          top: 80,
-          right: 12,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('debug: posts=$docsCount', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                if (sample.isNotEmpty) SizedBox(width: 200, child: Text(sample, style: const TextStyle(color: Colors.white70, fontSize: 11), maxLines: 4, overflow: TextOverflow.ellipsis)),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildTopTab(String title, bool isActive) {
     return GestureDetector(
       onTap: () {
@@ -488,34 +357,15 @@ class _HomePageState extends State<HomePage> {
         final userData = snapshot.data ?? {};
         final username = userData['username'] as String? ?? authorEmail.split('@').first;
         final profileImagePath = userData['profileImagePath'] as String?;
-        Widget imageWidget;
-        if (imageUrl != null && imageUrl.isNotEmpty) {
-          if (_isDisplayableNetworkLikeUrl(imageUrl)) {
-            imageWidget = Image.network(
-              imageUrl,
-              width: double.infinity,
-              height: double.infinity,
-              fit: BoxFit.contain,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return const Center(child: CircularProgressIndicator());
-              },
-              errorBuilder: (context, error, stack) {
-                return _placeholderImageWidget();
-              },
-            );
-          } else if (!kIsWeb && File(imageUrl).existsSync()) {
-            imageWidget = Image.file(File(imageUrl), width: double.infinity, height: double.infinity, fit: BoxFit.contain);
-          } else {
-            imageWidget = Container(color: Colors.grey.shade900);
-          }
-        } else {
-          imageWidget = Container(color: Colors.grey.shade900);
-        }
-
         return Stack(
           children: [
-            imageWidget,
+            Builder(
+              builder: (context) {
+                final provider = imageProviderFromPath(imageUrl);
+                if (provider == null) return Container(color: Colors.grey.shade900);
+                return Image(image: provider, width: double.infinity, height: double.infinity, fit: BoxFit.contain);
+              },
+            ),
 
             Positioned.fill(
               child: DecoratedBox(
@@ -552,8 +402,12 @@ class _HomePageState extends State<HomePage> {
                     MarketplaceSearchButton(
                       size: 44,
                       onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => MarketplaceSearchScreen(imageUrl: imageUrl, imagePath: imageUrl, queryHint: caption.toString())),
+                        openMarketplaceSearch(
+                          context,
+                          imageUrl: imageUrl,
+                          imagePath: imageUrl,
+                          queryHint: caption?.toString(),
+                          requireImage: true,
                         );
                       },
                     ),
@@ -583,8 +437,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildSideAction({IconData? icon, Color? color, double size = 32, VoidCallback? onTap, String? profileImagePath}) {
-    if (!kIsWeb && profileImagePath != null && File(profileImagePath).existsSync()) {
-      return CircleAvatar(backgroundImage: FileImage(File(profileImagePath)), radius: size, backgroundColor: Colors.grey.shade300);
+    final provider = imageProviderFromPath(profileImagePath);
+    if (provider != null) {
+      return CircleAvatar(backgroundImage: provider, radius: size, backgroundColor: Colors.grey.shade300);
     }
     return GestureDetector(onTap: onTap, child: Icon(icon, color: color ?? Colors.white, size: size));
   }

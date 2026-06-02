@@ -8,7 +8,6 @@ import 'package:stylee_app/services/backend_api_service.dart';
 
 class AuthPage extends StatelessWidget {
   const AuthPage({super.key});
-// фрукт
   @override
   Widget build(BuildContext context) {
     return Scaffold(

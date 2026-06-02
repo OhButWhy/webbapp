@@ -366,10 +366,7 @@ def call_openrouter(system_prompt: str, user_message: str, image_base64: Optiona
     last_error: Optional[HTTPException] = None
     for model in models:
         try:
-            if model != OPENROUTER_MODEL:
-                print(f"[call_openrouter] retrying with fallback model={model}")
             result = _call_openrouter_model(model, system_prompt, user_message, image_base64, image_mime_type)
-            print(f"[call_openrouter] model={model} succeeded")
             return result, model
         except HTTPException as error:
             last_error = error
@@ -381,7 +378,6 @@ def call_openrouter(system_prompt: str, user_message: str, image_base64: Optiona
         raise last_error
 
     raise HTTPException(status_code=502, detail="OpenRouter request failed")
-
 
 def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
     encoded = urllib.parse.quote_plus(seed_query or "стильная одежда")
@@ -396,18 +392,27 @@ def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
         },
         {
             "title": "Блейзер прямого кроя",
-            "marketplace": "Ozon",
-            "url": f"https://www.ozon.ru/search/?text={encoded}",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+блейзер"
+            ),
         },
         {
             "title": "Джинсы wide-leg",
-            "marketplace": "Lamoda",
-            "url": f"https://www.lamoda.ru/catalogsearch/result/?q={encoded}",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+джинсы"
+            ),
         },
         {
             "title": "Рубашка oversize",
-            "marketplace": "Яндекс Маркет",
-            "url": f"https://market.yandex.ru/search?text={encoded}",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+рубашка"
+            ),
         },
         {
             "title": "Тренч классический",
@@ -419,21 +424,27 @@ def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
         },
         {
             "title": "Юбка плиссе",
-            "marketplace": "Ozon",
-            "url": f"https://www.ozon.ru/search/?text={encoded}+юбка",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+юбка"
+            ),
         },
         {
             "title": "Кроссовки минималистичные",
-            "marketplace": "Lamoda",
+            "marketplace": "Wildberries",
             "url": (
-                "https://www.lamoda.ru/catalogsearch/result/?q="
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
                 f"{encoded}+кроссовки"
             ),
         },
         {
             "title": "Сумка через плечо",
-            "marketplace": "Яндекс Маркет",
-            "url": f"https://market.yandex.ru/search?text={encoded}+сумка",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+сумка"
+            ),
         },
         {
             "title": "Пальто демисезонное",
@@ -445,8 +456,11 @@ def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
         },
         {
             "title": "Аксессуары к образу",
-            "marketplace": "Ozon",
-            "url": f"https://www.ozon.ru/search/?text={encoded}+аксессуары",
+            "marketplace": "Wildberries",
+            "url": (
+                "https://www.wildberries.ru/catalog/0/search.aspx?search="
+                f"{encoded}+аксессуары"
+            ),
         },
     ]
 
@@ -460,6 +474,29 @@ def health() -> dict[str, str]:
 def marketplace_search_by_image(
     payload: MarketplaceSearchPayload,
 ) -> dict[str, Any]:
+    # if real pipeline enabled via env var, try to run it
+    try:
+        if os.environ.get('REAL_MARKETPLACE_ENABLED', '0') == '1':
+            from marketplace_real import real_search_by_image
+
+            results = real_search_by_image(
+                payload.imageUrl, payload.imagePath, payload.query, max_results=10
+            )
+            # If real pipeline produced results, return them. Otherwise fall back to stub.
+            if results and len(results) > 0:
+                return {"results": results, "source": "real", "count": len(results)}
+            else:
+                import logging
+
+                logging.getLogger("backend").info(
+                    "real_search_by_image returned 0 results — falling back to stub"
+                )
+    except Exception:
+        import logging
+
+        logging.getLogger("backend").exception(
+            "real_search_by_image failed — falling back to stub"
+        )
     seed_parts: list[str] = []
     if payload.query:
         seed_parts.append(payload.query.strip())
@@ -472,22 +509,30 @@ def marketplace_search_by_image(
         " ".join(part for part in seed_parts if part).strip() or "стильная одежда"
     )
     results = build_marketplace_stub_results(seed_query)[:10]
+
+    # Ensure stub results include scoring fields for consistent frontend handling
+    normalized = []
+    for r in results:
+        item = dict(r)
+        item.setdefault('text_score', None)
+        item.setdefault('visual_score', None)
+        item.setdefault('score', None)
+        item.setdefault('thumbnail', None)
+        normalized.append(item)
+
     return {
-        "results": results,
+        "results": normalized,
         "source": "stub",
-        "count": len(results),
+        "count": len(normalized),
     }
 
 
 @app.post("/users/{email}/bootstrap")
 def bootstrap_user(email: str) -> dict[str, Any]:
-    print(f"[bootstrap_user] email={email}")
     with db_connection() as conn:
         ensure_user(conn, email)
         conn.commit()
-        result = get_profile_payload(conn, email)
-        print(f"[bootstrap_user] result: {result}")
-        return result
+        return get_profile_payload(conn, email)
 
 
 @app.get("/users/{email}/profile")
@@ -509,7 +554,6 @@ def username_available(email: str, username: str = Query(..., min_length=1)) -> 
 
 @app.put("/users/{email}/profile")
 def upsert_profile(email: str, payload: ProfileUpsert) -> dict[str, Any]:
-    print(f"[upsert_profile] email={email}, username={payload.username}, bio={payload.bio}, image_path={payload.profile_image_path}")
     with db_connection() as conn:
         ensure_user(conn, email)
         conn.execute(
@@ -521,26 +565,19 @@ def upsert_profile(email: str, payload: ProfileUpsert) -> dict[str, Any]:
             (payload.username, payload.bio, payload.profile_image_path, email),
         )
         conn.commit()
-        result = get_profile_payload(conn, email)
-        print(f"[upsert_profile] result: {result}")
-        return result
+        return get_profile_payload(conn, email)
 
 
 @app.post("/users/{email}/test-result")
 def save_test_result(email: str, payload: TestResultPayload) -> dict[str, Any]:
-    print(f"[save_test_result] email={email}, payload={payload.model_dump()}")
     with db_connection() as conn:
         ensure_user(conn, email)
-        test_result_json = json.dumps(payload.model_dump(), ensure_ascii=False)
-        print(f"[save_test_result] storing: {test_result_json}")
         conn.execute(
             "UPDATE users SET test_result_json = ? WHERE email = ?",
-            (test_result_json, email),
+            (json.dumps(payload.model_dump(), ensure_ascii=False), email),
         )
         conn.commit()
-        result = get_profile_payload(conn, email)
-        print(f"[save_test_result] result: {result}")
-        return result
+        return get_profile_payload(conn, email)
 
 
 @app.get("/users/{email}/test-result")
@@ -718,11 +755,9 @@ def add_message(email: str, chat_id: str, payload: ChatMessagePayload) -> dict[s
 
 @app.post("/ai/chat")
 def ai_chat(payload: AiChatPayload) -> dict[str, Any]:
-    print(f"[ai_chat] email={payload.email}, message={payload.message[:100] if payload.message else 'no message'}")
     with db_connection() as conn:
         ensure_user(conn, payload.email)
         profile = get_profile_payload(conn, payload.email)
-        print(f"[ai_chat] profile loaded: {profile}")
         if payload.chatId:
             chat_id = payload.chatId
             chat = conn.execute(

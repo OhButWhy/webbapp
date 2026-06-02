@@ -1,7 +1,8 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:stylee_app/components/marketplace_search_button.dart';
+import 'package:stylee_app/components/marketplace_search_launcher.dart';
 
 class PostDetailPage extends StatefulWidget {
   final List<Map<String, dynamic>> posts;
@@ -131,11 +132,6 @@ class _PostDetailPageState extends State<PostDetailPage> {
     try {
       await FirebaseFirestore.instance.collection('posts').doc(docId).delete();
 
-      final imageUrl = post['imageUrl'] as String?;
-      if (imageUrl != null && File(imageUrl).existsSync()) {
-        await File(imageUrl).delete();
-      }
-
       if (mounted) {
         setState(() {
           widget.posts.removeAt(index);
@@ -213,6 +209,14 @@ class _PostDetailPageState extends State<PostDetailPage> {
     return '${postDate.day}.${postDate.month}.${postDate.year}';
   }
 
+  bool _isUrl(String? value) {
+    if (value == null) return false;
+    return value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('data:') ||
+        value.startsWith('blob:');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -254,12 +258,10 @@ class _PostDetailPageState extends State<PostDetailPage> {
                         CircleAvatar(
                           radius: 17,
                           backgroundColor: Colors.grey.shade200,
-                          backgroundImage: (profileImagePath != null && 
-                                          File(profileImagePath).existsSync())
-                              ? FileImage(File(profileImagePath))
+                          backgroundImage: (profileImagePath != null && _isUrl(profileImagePath))
+                              ? NetworkImage(profileImagePath)
                               : null,
-                          child: (profileImagePath == null || 
-                                  !File(profileImagePath).existsSync())
+                          child: (profileImagePath == null || !_isUrl(profileImagePath))
                               ? const Icon(Icons.person, size: 18, color: Colors.grey)
                               : null,
                         ),
@@ -283,16 +285,38 @@ class _PostDetailPageState extends State<PostDetailPage> {
                   // 2. Изображение
                   AspectRatio(
                     aspectRatio: 1,
-                    child: imageUrl != null && imageUrl.isNotEmpty && File(imageUrl).existsSync()
-                        ? Image.file(
-                            File(imageUrl),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                          )
-                        : Container(
-                            color: Colors.grey.shade200,
-                            child: const Center(child: Icon(Icons.image_not_supported, size: 50)),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: imageUrl != null && imageUrl.isNotEmpty && _isUrl(imageUrl)
+                              ? Image.network(
+                                  imageUrl,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                )
+                              : Container(
+                                  color: Colors.grey.shade200,
+                                  child: const Center(child: Icon(Icons.image_not_supported, size: 50)),
+                                ),
+                        ),
+                        if (imageUrl != null && imageUrl.isNotEmpty && _isUrl(imageUrl))
+                          Positioned(
+                            right: 12,
+                            top: 12,
+                            child: MarketplaceSearchButton(
+                              size: 36,
+                              onTap: () {
+                                openMarketplaceSearch(
+                                  context,
+                                  imageUrl: imageUrl,
+                                  queryHint: caption,
+                                  requireImage: true,
+                                );
+                              },
+                            ),
                           ),
+                      ],
+                    ),
                   ),
 
                   // 3. Кнопки действий

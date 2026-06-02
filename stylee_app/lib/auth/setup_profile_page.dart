@@ -1,16 +1,14 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
 import 'package:stylee_app/models/test_result.dart';
 import 'package:stylee_app/screens/home_page.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:stylee_app/utils/image_provider_from_path.dart';
 
 class SetupProfilePage extends StatefulWidget {
   final String email;
@@ -111,20 +109,8 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
       String? savedImagePath;
       if (_profileImagePath != null) {
-        if (kIsWeb) {
-          // On Flutter Web we can't use path_provider or reliably copy files to app storage.
-          // Keep the picked reference as-is for demo purposes.
-          savedImagePath = _profileImagePath;
-        } else {
-          final directory = await getApplicationDocumentsDirectory();
-          final fileName = 'profile_${widget.email.replaceAll('@', '_').replaceAll('.', '_')}.jpg';
-          savedImagePath = '${directory.path}/$fileName';
-
-          final file = File(_profileImagePath!);
-          if (file.existsSync()) {
-            await file.copy(savedImagePath);
-          }
-        }
+        // Web-safe: keep picked reference as-is (on mobile it is a file path, on web it can be a blob/data URL).
+        savedImagePath = _profileImagePath;
       }
 
       await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -133,15 +119,14 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
       );
 
       // Инициализировать юзера в бэкенде
-      print('[SetupProfile] Bootstrapping user: ${widget.email}');
       await _backend.bootstrapUser(widget.email);
-      print('[SetupProfile] Saving profile...');
       await _backend.saveProfile(
         email: widget.email,
         username: username,
         bio: _bioController.text.trim(),
         profileImagePath: savedImagePath,
       );
+
       // Mirror profile to Firestore so frontend pages that read Firestore see the profile immediately
       try {
         await FirebaseFirestore.instance.collection('Users').doc(widget.email).set({
@@ -151,14 +136,12 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
           'profileImagePath': savedImagePath,
           'hasCompletedTest': false,
         }, SetOptions(merge: true));
-        print('[SetupProfile] Firestore user doc created/updated');
       } catch (e) {
-        print('[SetupProfile] Firestore write failed: $e');
+        // ignore: avoid_print
+        print('Firestore write failed: $e');
       }
-      print('[SetupProfile] Profile saved successfully');
 
       // Начать прохождение теста
-      print('[SetupProfile] Starting quiz...');
       final testResult = await Navigator.push<TestResult?>(
         context,
         MaterialPageRoute(
@@ -173,11 +156,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
       // Сохранить результат теста если есть
       if (testResult != null) {
-        print('[SetupProfile] Saving test result...');
         await _saveTestResult(testResult);
-        print('[SetupProfile] Test result saved');
-      } else {
-        print('[SetupProfile] No test result returned');
       }
 
       if (_enableTwoFactor) {
@@ -202,21 +181,20 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
 
   Future<void> _saveTestResult(TestResult result) async {
     try {
-      print('[SetupProfile._saveTestResult] Calling backend.saveTestResult with: ${result.toMap()}');
-      final response = await _backend.saveTestResult(widget.email, result.toMap());
-      print('[SetupProfile._saveTestResult] Success, response: $response');
+      await _backend.saveTestResult(widget.email, result.toMap());
       // Mirror test result to Firestore so ProfilePage gating sees completion
       try {
         await FirebaseFirestore.instance.collection('Users').doc(widget.email).set({
           'hasCompletedTest': true,
           'testResult': result.toMap(),
         }, SetOptions(merge: true));
-        print('[SetupProfile._saveTestResult] Firestore testResult written');
       } catch (e) {
-        print('[SetupProfile._saveTestResult] Firestore write failed: $e');
+        // ignore: avoid_print
+        print('Firestore write failed: $e');
       }
     } catch (e) {
-      print('[SetupProfile._saveTestResult] Error: $e');
+      // ignore: avoid_print
+      print('Error saving test result: $e');
       rethrow;
     }
   }
@@ -377,6 +355,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
         bio: '',
         profileImagePath: null,
       );
+
       // Ensure Firestore doc exists as well for UI
       try {
         await FirebaseFirestore.instance.collection('Users').doc(widget.email).set({
@@ -387,7 +366,8 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
           'hasCompletedTest': false,
         }, SetOptions(merge: true));
       } catch (e) {
-        print('[SetupProfile._skipSetup] Firestore write failed: $e');
+        // ignore: avoid_print
+        print('Firestore write failed: $e');
       }
 
       if (mounted) {
@@ -476,11 +456,7 @@ class _SetupProfilePageState extends State<SetupProfilePage> {
                       CircleAvatar(
                         radius: 60,
                         backgroundColor: const Color(0xFFF8E8EA),
-                        backgroundImage: _profileImagePath != null
-                            ? (kIsWeb
-                                ? NetworkImage(_profileImagePath!)
-                                : FileImage(File(_profileImagePath!)) as ImageProvider)
-                            : null,
+                        backgroundImage: imageProviderFromPath(_profileImagePath),
                         child: _profileImagePath == null
                             ? const Icon(
                                 Icons.person_add,

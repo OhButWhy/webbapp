@@ -1,11 +1,9 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart'; // Добавили импорт
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
+import 'package:stylee_app/utils/image_provider_from_path.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -107,19 +105,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       
       // Если выбрали новое фото, сохраняем его локально
       if (_newImagePath != null) {
-        if (kIsWeb) {
-          // Web demo: keep the picked reference (likely a blob URL).
-          savedImagePath = _newImagePath;
-        } else {
-          final directory = await getApplicationDocumentsDirectory();
-          final fileName = 'profile_${currentUser.email!.replaceAll('@', '_').replaceAll('.', '_')}.jpg';
-          savedImagePath = '${directory.path}/$fileName';
-
-          final file = File(_newImagePath!);
-          if (file.existsSync()) {
-            await file.copy(savedImagePath);
-          }
-        }
+        // Web-safe: keep picked reference as-is.
+        savedImagePath = _newImagePath;
       }
 
       // 1. Сохраняем в Python-бэкенд (SQLite)
@@ -214,15 +201,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     CircleAvatar(
                       radius: 60,
                       backgroundColor: const Color(0xFFF8E8EA),
-                      backgroundImage: _newImagePath != null
-                        ? (kIsWeb
-                          ? NetworkImage(_newImagePath!)
-                          : FileImage(File(_newImagePath!)) as ImageProvider)
-                        : _profileImagePath != null
-                          ? (kIsWeb
-                            ? NetworkImage(_profileImagePath!)
-                            : FileImage(File(_profileImagePath!)) as ImageProvider)
-                          : null,
+                      backgroundImage: imageProviderFromPath(_newImagePath ?? _profileImagePath),
                       child: (_newImagePath == null && _profileImagePath == null)
                           ? const Icon(
                               Icons.person,

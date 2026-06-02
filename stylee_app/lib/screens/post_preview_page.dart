@@ -1,9 +1,8 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:stylee_app/utils/image_provider_from_path.dart';
 
 class PostPreviewPage extends StatefulWidget {
   final String imagePath;
@@ -27,16 +26,11 @@ class _PostPreviewPageState extends State<PostPreviewPage> {
       );
       return;
     }
-
     setState(() => _isUploading = true);
 
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = 'post_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final savedPath = '${directory.path}/$fileName';
-      
-      final file = File(widget.imagePath);
-      if (file.existsSync()) await file.copy(savedPath);
+      // Note: app currently stores local file references in Firestore; keep behavior but avoid dart:io.
+      final savedPath = widget.imagePath;
 
       await FirebaseFirestore.instance.collection('posts').add({
         'userId': currentUser.uid,
@@ -105,9 +99,15 @@ class _PostPreviewPageState extends State<PostPreviewPage> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                    child: kIsWeb
-                        ? Image.network(widget.imagePath, fit: BoxFit.cover)
-                        : Image.file(File(widget.imagePath), fit: BoxFit.cover),
+                  child: Builder(
+                    builder: (context) {
+                      final provider = imageProviderFromPath(widget.imagePath);
+                      if (provider == null) {
+                        return const Center(child: Icon(Icons.image_not_supported));
+                      }
+                      return Image(image: provider, fit: BoxFit.cover);
+                    },
+                  ),
                 ),
               ),
             ),

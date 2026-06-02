@@ -73,6 +73,34 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
     );
   }
 
+  Widget _buildLeading(MarketplaceResult item) {
+    final thumb = item.thumbnail;
+    if (thumb != null && thumb.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          thumb,
+          width: 46,
+          height: 46,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const CircleAvatar(
+            backgroundColor: Color(0xFFE91E63),
+            child: Text(
+              'M',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      );
+    }
+    return const CircleAvatar(
+      backgroundColor: Color(0xFFE91E63),
+      child: Text(
+        'M',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,13 +161,7 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
         final item = _results[index];
         return Card(
           child: ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: Color(0xFFE91E63),
-              child: Text(
-                'M',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-            ),
+            leading: _buildLeading(item),
             title: Text(item.title),
             subtitle: Text('${item.marketplace}\n${item.url}'),
             isThreeLine: true,

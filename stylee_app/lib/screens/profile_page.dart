@@ -1,11 +1,9 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:stylee_app/utils/image_provider_from_path.dart';
 import 'package:stylee_app/screens/edit_profile_page.dart';
 import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
 import 'package:stylee_app/screens/post_detail_page.dart';
@@ -30,7 +28,6 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _loadLocalImagePath();
   }
 
   Future<void> _createPost() async {
@@ -43,14 +40,8 @@ class _ProfilePageState extends State<ProfilePage> {
       );
       if (image == null) return;
 
-      String imageUrl = image.path;
-      if (!kIsWeb) {
-        final directory = await getApplicationDocumentsDirectory();
-        final fileName = 'post_${currentUser.email!.replaceAll('@', '_').replaceAll('.', '_')}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final savedPath = '${directory.path}/$fileName';
-        await File(image.path).copy(savedPath);
-        imageUrl = savedPath;
-      }
+      // Web-safe: store the picked path/URL as-is.
+      final imageUrl = image.path;
 
       await FirebaseFirestore.instance.collection('posts').add({
         'userEmail': currentUser.email,
@@ -69,19 +60,23 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     }
   }
+  
+  Widget _buildTabIcon(IconData icon, int tabIndex) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = tabIndex),
+        child: Container(
+          height: 50,
+          color: Colors.transparent,
+          child: Icon(icon, color: _selectedTab == tabIndex ? const Color(0xFFE91E63) : Colors.grey.shade400, size: 24),
+        ),
+      ),
+    );
+  }
 
   Future<void> _loadLocalImagePath() async {
-    try {
-      if (kIsWeb) return;
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = 'profile_${currentUser.email!.replaceAll('@', '_').replaceAll('.', '_')}.jpg';
-      final path = '${directory.path}/$fileName';
-      if (File(path).existsSync()) {
-        setState(() => _localProfileImagePath = path);
-      }
-    } catch (e) {
-      print('Error loading local image: $e');
-    }
+    // Keep local path handling simple and web-safe: prefer Firestore-stored path.
+    return;
   }
 
   Future<void> _pickImage() async {
@@ -111,29 +106,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _saveImageLocally(String imagePath) async {
     try {
-      if (kIsWeb) {
-        await usersCollection.doc(currentUser.email).update({
-          'profileImagePath': imagePath,
-        }).timeout(const Duration(seconds: 5));
-
-        if (mounted) {
-          setState(() => _localProfileImagePath = imagePath);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Фото обновлено!')),
-          );
-        }
-        return;
-      }
-
-      final directory = await getApplicationDocumentsDirectory();
-      final fileName = 'profile_${currentUser.email!.replaceAll('@', '_').replaceAll('.', '_')}.jpg';
-      final savedPath = '${directory.path}/$fileName';
-      
-      final file = File(imagePath);
-      if (!file.existsSync()) throw Exception('Файл не существует');
-      
-      await file.copy(savedPath);
-
+      // Web-safe: write the picked path (or blob URL) into Firestore so UI updates.
+      final savedPath = imagePath;
       await usersCollection.doc(currentUser.email).update({
         'profileImagePath': savedPath,
       }).timeout(const Duration(seconds: 5));
@@ -190,7 +164,6 @@ class _ProfilePageState extends State<ProfilePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Вы вышли из аккаунта')),
       );
-      // Navigate back to login screen and clear all previous routes
       Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
     }
   }
@@ -261,12 +234,8 @@ class _ProfilePageState extends State<ProfilePage> {
                               CircleAvatar(
                                 radius: 50,
                                 backgroundColor: const Color(0xFFF8E8EA),
-                                backgroundImage: (displayImagePath != null && kIsWeb)
-                                    ? NetworkImage(displayImagePath)
-                                    : (displayImagePath != null && File(displayImagePath).existsSync())
-                                        ? FileImage(File(displayImagePath))
-                                        : null,
-                                child: (displayImagePath == null || (!kIsWeb && !File(displayImagePath!).existsSync())) && !_isUploading
+                                backgroundImage: imageProviderFromPath(displayImagePath),
+                                child: (displayImagePath == null || !canDisplayPathAsImage(displayImagePath)) && !_isUploading
                                     ? Icon(
                                         Icons.person,
                                         size: 60,
@@ -356,40 +325,6 @@ class _ProfilePageState extends State<ProfilePage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _createPost,
-                            icon: const Icon(Icons.add_photo_alternate),
-                            label: const Text('Создать пост'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFE91E63),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _signOut,
-                            icon: const Icon(Icons.logout),
-                            label: const Text('Выйти из аккаунта'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.black87,
-                              side: BorderSide(color: Colors.grey.shade300),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                          ),
-                        ),
                         const SizedBox(height: 24),
                         
                         // Stories Highlights
@@ -421,7 +356,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
 
-                // Tabs (Posts, Reposts, Wardrobe) - Instagram style with white background
+                // Tabs (Posts, Reposts, Wardrobe) - simplified
                 SliverToBoxAdapter(
                   child: Container(
                     color: Colors.white,
@@ -429,61 +364,19 @@ class _ProfilePageState extends State<ProfilePage> {
                       children: [
                         Row(
                           children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _selectedTab = 0),
-                                child: Container(
-                                  height: 50,
-                                  color: Colors.transparent,
-                                  child: Icon(
-                                    Icons.grid_view_rounded,
-                                    color: _selectedTab == 0 ? const Color(0xFFE91E63) : Colors.grey.shade400,
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            _buildTabIcon(Icons.grid_view_rounded, 0),
                             Container(width: 0.5, color: Colors.grey.shade300),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _selectedTab = 1),
-                                child: Container(
-                                  height: 50,
-                                  color: Colors.transparent,
-                                  child: Icon(
-                                    Icons.repeat_rounded,
-                                    color: _selectedTab == 1 ? const Color(0xFFE91E63) : Colors.grey.shade400,
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            _buildTabIcon(Icons.repeat_rounded, 1),
                             Container(width: 0.5, color: Colors.grey.shade300),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _selectedTab = 2),
-                                child: Container(
-                                  height: 50,
-                                  color: Colors.transparent,
-                                  child: Icon(
-                                    Icons.checkroom_rounded,
-                                    color: _selectedTab == 2 ? const Color(0xFFE91E63) : Colors.grey.shade400,
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                            ),
+                            _buildTabIcon(Icons.checkroom_rounded, 2),
                           ],
                         ),
-                        // Active tab indicator line
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           height: 2,
                           child: Container(
                             width: MediaQuery.of(context).size.width / 3,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE91E63),
-                            ),
+                            decoration: const BoxDecoration(color: Color(0xFFE91E63)),
                           ),
                         ),
                       ],
@@ -491,9 +384,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
 
-                // Grid Content based on selected tab
+                // Content for tabs
                 if (_selectedTab == 0)
-                  // My Posts
                   SliverPadding(
                     padding: EdgeInsets.zero,
                     sliver: StreamBuilder<QuerySnapshot>(
@@ -503,116 +395,49 @@ class _ProfilePageState extends State<ProfilePage> {
                           .orderBy('createdAt', descending: true)
                           .snapshots(),
                       builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return SliverToBoxAdapter(
-                            child: Center(child: Text('Ошибка: ${snapshot.error}')),
-                          );
-                        }
-
-                        if (!snapshot.hasData) {
-                          return const SliverToBoxAdapter(
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-
+                        if (!snapshot.hasData) return const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()));
                         final posts = snapshot.data!.docs;
-
                         if (posts.isEmpty) {
                           return SliverToBoxAdapter(
                             child: SizedBox(
                               height: MediaQuery.of(context).size.height * 0.5,
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.photo_library_outlined,
-                                      size: 80,
-                                      color: Colors.pink.shade200,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'Пока ничего нет',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Делитесь своими образами ✨',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey.shade400,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              child: Center(child: Text('Пока ничего нет', style: TextStyle(color: Colors.grey.shade500))),
                             ),
                           );
                         }
 
-                        // Сетка постов 3x3 без отступов
                         return SliverGrid(
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            mainAxisSpacing: 0,
-                            crossAxisSpacing: 0,
-                            childAspectRatio: 1,
-                          ),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 0, crossAxisSpacing: 0, childAspectRatio: 1),
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
                               final post = posts[index];
-                              final postData = post.data() as Map<String, dynamic>;
-                              final imageUrl = postData['imageUrl'] as String?;
-                              final hasLocalFile = !kIsWeb && imageUrl != null && File(imageUrl).existsSync();
-                              final hasWebImage = kIsWeb && imageUrl != null && imageUrl.isNotEmpty;
+                              final data = post.data() as Map<String, dynamic>;
+                              final imageUrl = data['imageUrl'] as String?;
 
                               return GestureDetector(
                                 onTap: () {
-                                  // Собираем все посты для передачи в detail page
                                   final allPosts = posts.map((p) {
-                                    final data = p.data() as Map<String, dynamic>;
+                                    final d = p.data() as Map<String, dynamic>;
                                     return {
                                       'docId': p.id,
-                                      'imageUrl': data['imageUrl'] as String?,
-                                      'caption': data['caption'] as String?,
-                                      'createdAt': data['createdAt'],
-                                      'Likes': data['Likes'] as List<dynamic>? ?? [],
+                                      'imageUrl': d['imageUrl'] as String?,
+                                      'caption': d['caption'] as String?,
+                                      'createdAt': d['createdAt'],
+                                      'Likes': d['Likes'] as List<dynamic>? ?? [],
                                     };
                                   }).toList();
 
-                                  final currentUsername = userData['username'] ?? currentUser.email!.split('@')[0];
-
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => PostDetailPage(
-                                        posts: allPosts,
-                                        initialIndex: index,
-                                        username: currentUsername,
-                                      ),
-                                    ),
-                                  );
+                                  Navigator.push(context, MaterialPageRoute(builder: (ctx) => PostDetailPage(posts: allPosts, initialIndex: index, username: userData['username'] ?? currentUser.email!.split('@')[0])));
                                 },
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    image: hasLocalFile
-                                        ? DecorationImage(image: FileImage(File(imageUrl!)), fit: BoxFit.cover)
-                                        : hasWebImage
-                                            ? DecorationImage(image: NetworkImage(imageUrl!), fit: BoxFit.cover)
-                                            : null,
+                                    image: (() {
+                                      final p = imageProviderFromPath(imageUrl);
+                                      return p != null ? DecorationImage(image: p, fit: BoxFit.cover) : null;
+                                    })(),
                                     color: Colors.grey.shade200,
                                   ),
-                                  child: imageUrl == null || (!kIsWeb && !File(imageUrl).existsSync())
-                                      ? const Icon(
-                                          Icons.image_not_supported,
-                                          color: Colors.grey,
-                                          size: 30,
-                                        )
-                                      : null,
+                                  child: imageUrl == null || !canDisplayPathAsImage(imageUrl) ? const Icon(Icons.image_not_supported, color: Colors.grey, size: 30) : null,
                                 ),
                               );
                             },
@@ -623,110 +448,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     ),
                   )
                 else if (_selectedTab == 1)
-                  // Reposts (empty for now)
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.5,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.repeat,
-                              size: 80,
-                              color: Colors.pink.shade200,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Репосты',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Здесь будут ваши репосты',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  )
+                  SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).size.height * 0.5, child: Center(child: Text('Репосты пока отсутствуют'))))
                 else
-                  // Wardrobe (empty for now)
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.5,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.checkroom,
-                              size: 80,
-                              color: Colors.pink.shade200,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Гардероб',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Здесь будет ваш гардероб',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHighlight(String label) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () {},
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [Color(0xFFE91E63), Color(0xFFFF6B9D), Color(0xFFFFB6C1)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: const CircleAvatar(
-              radius: 30,
-              backgroundColor: Color(0xFFF5E6E8),
-              child: CircleAvatar(radius: 27, backgroundColor: Colors.white),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(fontSize: 12)),
-      ],
-    );
-  }
-}
+                  SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).size.height * 0.5, child: Center(child: Text('Гардероб пуст')))),

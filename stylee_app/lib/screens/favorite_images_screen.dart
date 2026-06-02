@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:stylee_app/components/marketplace_search_button.dart';
+import 'package:stylee_app/components/marketplace_search_launcher.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
 
 class FavoriteImagesScreen extends StatefulWidget {
@@ -30,13 +32,13 @@ class _FavoriteImagesScreenState extends State<FavoriteImagesScreen> {
     }
 
     setState(() {
-      // optimistic reset while loading new data
-      loading = false;
+      loading = true;
     });
 
     final favorites = await _backend.getFavorites(user.email!);
     setState(() {
       favoriteImages = favorites;
+      loading = false;
     });
   }
 
@@ -136,27 +138,55 @@ class _FavoriteImagesScreenState extends State<FavoriteImagesScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-              child: Container(
-                color: Colors.grey.shade200,
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.pink),
-                      ),
-                    );
-                  },
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                  child: Container(
+                    color: Colors.grey.shade200,
+                    child: imageUrl.isEmpty
+                        ? const Center(
+                            child: Icon(Icons.image_not_supported, color: Colors.grey),
+                          )
+                        : Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.pink),
+                                ),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.broken_image_outlined, color: Colors.grey),
+                            ),
+                          ),
+                  ),
                 ),
-              ),
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: MarketplaceSearchButton(
+                    size: 36,
+                    onTap: () {
+                      openMarketplaceSearch(
+                        context,
+                        imageUrl: imageUrl,
+                        queryHint: 'Избранное ${index + 1}',
+                        requireImage: true,
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
           Padding(
