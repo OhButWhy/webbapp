@@ -70,6 +70,45 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
   
+  Future<void> _deletePost(String docId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить пост?'),
+        content: const Text('Этот пост будет удалён навсегда.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('posts').doc(docId).delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Пост удалён')),
+        );
+      }
+    } catch (e) {
+      print('Error deleting post: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка при удалении: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildTabIcon(IconData icon, int tabIndex) {
     return Expanded(
       child: GestureDetector(
@@ -473,15 +512,36 @@ class _ProfilePageState extends State<ProfilePage> {
 
                                   Navigator.push(context, MaterialPageRoute(builder: (ctx) => PostDetailPage(posts: allPosts, initialIndex: index, username: userData['username'] ?? currentUser.email!.split('@')[0])));
                                 },
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    image: (() {
-                                      final p = imageProviderFromPath(imageUrl);
-                                      return p != null ? DecorationImage(image: p, fit: BoxFit.cover) : null;
-                                    })(),
-                                    color: Colors.grey.shade200,
-                                  ),
-                                  child: imageUrl == null || !canDisplayPathAsImage(imageUrl) ? const Icon(Icons.image_not_supported, color: Colors.grey, size: 30) : null,
+                                onLongPress: () => _deletePost(post.id),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        image: (() {
+                                          final p = imageProviderFromPath(imageUrl);
+                                          return p != null ? DecorationImage(image: p, fit: BoxFit.cover) : null;
+                                        })(),
+                                        color: Colors.grey.shade200,
+                                      ),
+                                      child: imageUrl == null || !canDisplayPathAsImage(imageUrl) ? const Icon(Icons.image_not_supported, color: Colors.grey, size: 30) : null,
+                                    ),
+                                    Positioned(
+                                      top: 6,
+                                      right: 6,
+                                      child: GestureDetector(
+                                        onTap: () => _deletePost(post.id),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(5),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(0.45),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.delete_outline, color: Colors.white, size: 18),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             },
