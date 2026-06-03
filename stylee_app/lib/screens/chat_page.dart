@@ -420,8 +420,11 @@ class _ChatPageState extends State<ChatPage> {
               
               final messageIndex = _isLoading ? index - 1 : index;
               if (messageIndex < 0) return const SizedBox.shrink();
-              
-              final message = _messages[messageIndex];
+
+              // Messages arrive oldest-first, but the list is rendered with
+              // reverse: true (index 0 is at the bottom). Index from the end so
+              // the newest message stays at the bottom.
+              final message = _messages[_messages.length - 1 - messageIndex];
               
               if (message['type'] == 'user') {
                 return _buildUserMessage(message['text'] as String?);
