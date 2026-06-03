@@ -1,10 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stylee_app/utils/image_provider_from_path.dart';
+import 'package:stylee_app/utils/image_upload.dart';
 import 'package:stylee_app/screens/edit_profile_page.dart';
 import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
 import 'package:stylee_app/screens/post_detail_page.dart';
@@ -31,22 +31,6 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
   }
 
-  // Uploads the picked image to Firebase Storage and returns a durable
-  // download URL. Reading bytes works on both web and mobile, unlike the
-  // ephemeral blob: path returned by image_picker on web (which dies on
-  // reload).
-  Future<String> _uploadImage(XFile image, String folder) async {
-    final bytes = await image.readAsBytes();
-    final sanitizedEmail = currentUser.email!.replaceAll(RegExp(r'[@.]'), '_');
-    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final ref = FirebaseStorage.instance.ref('$folder/$sanitizedEmail/$fileName');
-    await ref.putData(
-      bytes,
-      SettableMetadata(contentType: image.mimeType ?? 'image/jpeg'),
-    );
-    return ref.getDownloadURL();
-  }
-
   Future<void> _createPost() async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -63,9 +47,10 @@ class _ProfilePageState extends State<ProfilePage> {
         );
       }
 
-      // Upload to Firebase Storage so the image persists across reloads and is
-      // visible to other users (web blob URLs are not durable).
-      final imageUrl = await _uploadImage(image, 'posts');
+      // Persist the image durably (Firebase Storage, or an inline data URI in
+      // Firestore as a fallback) so it survives reloads and is visible to
+      // other users — web blob URLs are not durable.
+      final imageUrl = await uploadImage(image, 'posts', currentUser.email!);
 
       await FirebaseFirestore.instance.collection('posts').add({
         'userEmail': currentUser.email,
@@ -130,9 +115,9 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _saveProfileImage(XFile image) async {
     try {
-      // Upload to Firebase Storage so the avatar persists across reloads
-      // (web blob URLs are not durable).
-      final savedPath = await _uploadImage(image, 'avatars');
+      // Persist the avatar durably so it survives reloads (web blob URLs are
+      // not durable).
+      final savedPath = await uploadImage(image, 'avatars', currentUser.email!);
       await usersCollection.doc(currentUser.email).update({
         'profileImagePath': savedPath,
       }).timeout(const Duration(seconds: 15));

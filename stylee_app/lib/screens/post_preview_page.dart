@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stylee_app/utils/image_provider_from_path.dart';
+import 'package:stylee_app/utils/image_upload.dart';
 
 class PostPreviewPage extends StatefulWidget {
   final XFile image;
@@ -25,19 +25,10 @@ class _PostPreviewPageState extends State<PostPreviewPage> {
     setState(() => _isUploading = true);
 
     try {
-      // Upload the picked image to Firebase Storage and store the durable
-      // download URL so the post renders on web and after reloads.
-      final bytes = await widget.image.readAsBytes();
-      final sanitizedEmail =
-          currentUser.email!.replaceAll(RegExp(r'[@.]'), '_');
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final ref =
-          FirebaseStorage.instance.ref('posts/$sanitizedEmail/$fileName');
-      await ref.putData(
-        bytes,
-        SettableMetadata(contentType: widget.image.mimeType ?? 'image/jpeg'),
-      );
-      final savedPath = await ref.getDownloadURL();
+      // Persist the image durably (Firebase Storage, or an inline data URI in
+      // Firestore as a fallback) so the post renders on web and after reloads.
+      final savedPath =
+          await uploadImage(widget.image, 'posts', currentUser.email!);
 
       await FirebaseFirestore.instance.collection('posts').add({
         'userId': currentUser.uid,
