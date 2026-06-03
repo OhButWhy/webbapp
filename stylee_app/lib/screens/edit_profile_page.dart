@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart'; // Добавили импорт
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
@@ -22,6 +23,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   
   String? _profileImagePath;
   String? _newImagePath;
+  XFile? _newImage;
   bool _isLoading = false;
   String? _usernameError;
 
@@ -57,7 +59,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
 
       if (image != null) {
-        setState(() => _newImagePath = image.path);
+        setState(() {
+          _newImage = image;
+          _newImagePath = image.path;
+        });
       }
     } catch (e) {
       print('Error picking image: $e');
@@ -103,10 +108,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       String? savedImagePath = _profileImagePath;
       
-      // Если выбрали новое фото, сохраняем его локально
-      if (_newImagePath != null) {
-        // Web-safe: keep picked reference as-is.
-        savedImagePath = _newImagePath;
+      // Если выбрали новое фото, загружаем его в Firebase Storage
+      // (долговечный URL вместо временного blob на web).
+      if (_newImage != null) {
+        final bytes = await _newImage!.readAsBytes();
+        final sanitizedEmail =
+            currentUser.email!.replaceAll(RegExp(r'[@.]'), '_');
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final ref =
+            FirebaseStorage.instance.ref('avatars/$sanitizedEmail/$fileName');
+        await ref.putData(
+          bytes,
+          SettableMetadata(
+              contentType: _newImage!.mimeType ?? 'image/jpeg'),
+        );
+        savedImagePath = await ref.getDownloadURL();
       }
 
       // 1. Сохраняем в Python-бэкенд (SQLite)

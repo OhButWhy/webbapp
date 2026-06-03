@@ -1,14 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:stylee_app/utils/image_provider_from_path.dart';
 
 class PostPreviewPage extends StatefulWidget {
+  final XFile image;
   final String imagePath;
   final VoidCallback? onFinish;
 
-  const PostPreviewPage({super.key, required this.imagePath, this.onFinish});
+  const PostPreviewPage({super.key, required this.image, required this.imagePath, this.onFinish});
 
   @override
   State<PostPreviewPage> createState() => _PostPreviewPageState();
@@ -20,17 +22,22 @@ class _PostPreviewPageState extends State<PostPreviewPage> {
   bool _isUploading = false;
 
   Future<void> _publishPost() async {
-    if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Публикация постов недоступна в web-демо'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
     setState(() => _isUploading = true);
 
     try {
-      // Note: app currently stores local file references in Firestore; keep behavior but avoid dart:io.
-      final savedPath = widget.imagePath;
+      // Upload the picked image to Firebase Storage and store the durable
+      // download URL so the post renders on web and after reloads.
+      final bytes = await widget.image.readAsBytes();
+      final sanitizedEmail =
+          currentUser.email!.replaceAll(RegExp(r'[@.]'), '_');
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref =
+          FirebaseStorage.instance.ref('posts/$sanitizedEmail/$fileName');
+      await ref.putData(
+        bytes,
+        SettableMetadata(contentType: widget.image.mimeType ?? 'image/jpeg'),
+      );
+      final savedPath = await ref.getDownloadURL();
 
       await FirebaseFirestore.instance.collection('posts').add({
         'userId': currentUser.uid,

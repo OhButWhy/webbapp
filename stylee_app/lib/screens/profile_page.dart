@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -30,6 +31,22 @@ class _ProfilePageState extends State<ProfilePage> {
     super.initState();
   }
 
+  // Uploads the picked image to Firebase Storage and returns a durable
+  // download URL. Reading bytes works on both web and mobile, unlike the
+  // ephemeral blob: path returned by image_picker on web (which dies on
+  // reload).
+  Future<String> _uploadImage(XFile image, String folder) async {
+    final bytes = await image.readAsBytes();
+    final sanitizedEmail = currentUser.email!.replaceAll(RegExp(r'[@.]'), '_');
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ref = FirebaseStorage.instance.ref('$folder/$sanitizedEmail/$fileName');
+    await ref.putData(
+      bytes,
+      SettableMetadata(contentType: image.mimeType ?? 'image/jpeg'),
+    );
+    return ref.getDownloadURL();
+  }
+
   Future<void> _createPost() async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -40,8 +57,15 @@ class _ProfilePageState extends State<ProfilePage> {
       );
       if (image == null) return;
 
-      // Web-safe: store the picked path/URL as-is.
-      final imageUrl = image.path;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Загрузка поста...')),
+        );
+      }
+
+      // Upload to Firebase Storage so the image persists across reloads and is
+      // visible to other users (web blob URLs are not durable).
+      final imageUrl = await _uploadImage(image, 'posts');
 
       await FirebaseFirestore.instance.collection('posts').add({
         'userEmail': currentUser.email,
@@ -52,11 +76,11 @@ class _ProfilePageState extends State<ProfilePage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Пост создан (демо)')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Пост опубликован')));
         setState(() {});
       }
     } catch (e) {
-      print('Error creating demo post: $e');
+      print('Error creating post: $e');
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     }
   }
@@ -90,7 +114,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (image != null && mounted) {
         setState(() => _isUploading = true);
-        await _saveImageLocally(image.path);
+        await _saveProfileImage(image);
         if (mounted) setState(() => _isUploading = false);
       }
     } catch (e) {
@@ -104,13 +128,14 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _saveImageLocally(String imagePath) async {
+  Future<void> _saveProfileImage(XFile image) async {
     try {
-      // Web-safe: write the picked path (or blob URL) into Firestore so UI updates.
-      final savedPath = imagePath;
+      // Upload to Firebase Storage so the avatar persists across reloads
+      // (web blob URLs are not durable).
+      final savedPath = await _uploadImage(image, 'avatars');
       await usersCollection.doc(currentUser.email).update({
         'profileImagePath': savedPath,
-      }).timeout(const Duration(seconds: 5));
+      }).timeout(const Duration(seconds: 15));
 
       if (mounted) {
         setState(() => _localProfileImagePath = savedPath);
