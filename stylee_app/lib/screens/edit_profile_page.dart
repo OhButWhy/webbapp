@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stylee_app/services/backend_api_service.dart';
 import 'package:stylee_app/utils/image_provider_from_path.dart';
+import 'package:stylee_app/utils/image_upload.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -22,6 +23,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   
   String? _profileImagePath;
   String? _newImagePath;
+  XFile? _newImage;
   bool _isLoading = false;
   String? _usernameError;
 
@@ -57,7 +59,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       );
 
       if (image != null) {
-        setState(() => _newImagePath = image.path);
+        setState(() {
+          _newImage = image;
+          _newImagePath = image.path;
+        });
       }
     } catch (e) {
       print('Error picking image: $e');
@@ -103,10 +108,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       String? savedImagePath = _profileImagePath;
       
-      // Если выбрали новое фото, сохраняем его локально
-      if (_newImagePath != null) {
-        // Web-safe: keep picked reference as-is.
-        savedImagePath = _newImagePath;
+      // Если выбрали новое фото, сохраняем его долговечно
+      // (Firebase Storage или data URI в Firestore как fallback).
+      if (_newImage != null) {
+        savedImagePath =
+            await uploadImage(_newImage!, 'avatars', currentUser.email!);
       }
 
       // 1. Сохраняем в Python-бэкенд (SQLite)

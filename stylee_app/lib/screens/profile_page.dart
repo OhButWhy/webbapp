@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:stylee_app/utils/image_provider_from_path.dart';
+import 'package:stylee_app/utils/image_upload.dart';
 import 'package:stylee_app/screens/edit_profile_page.dart';
 import 'package:stylee_app/screens/quiz/quiz_wizard.dart';
 import 'package:stylee_app/screens/post_detail_page.dart';
@@ -40,8 +41,16 @@ class _ProfilePageState extends State<ProfilePage> {
       );
       if (image == null) return;
 
-      // Web-safe: store the picked path/URL as-is.
-      final imageUrl = image.path;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Загрузка поста...')),
+        );
+      }
+
+      // Persist the image durably (Firebase Storage, or an inline data URI in
+      // Firestore as a fallback) so it survives reloads and is visible to
+      // other users — web blob URLs are not durable.
+      final imageUrl = await uploadImage(image, 'posts', currentUser.email!);
 
       await FirebaseFirestore.instance.collection('posts').add({
         'userEmail': currentUser.email,
@@ -52,11 +61,11 @@ class _ProfilePageState extends State<ProfilePage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Пост создан (демо)')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Пост опубликован')));
         setState(() {});
       }
     } catch (e) {
-      print('Error creating demo post: $e');
+      print('Error creating post: $e');
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
     }
   }
@@ -90,7 +99,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (image != null && mounted) {
         setState(() => _isUploading = true);
-        await _saveImageLocally(image.path);
+        await _saveProfileImage(image);
         if (mounted) setState(() => _isUploading = false);
       }
     } catch (e) {
@@ -104,13 +113,14 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _saveImageLocally(String imagePath) async {
+  Future<void> _saveProfileImage(XFile image) async {
     try {
-      // Web-safe: write the picked path (or blob URL) into Firestore so UI updates.
-      final savedPath = imagePath;
+      // Persist the avatar durably so it survives reloads (web blob URLs are
+      // not durable).
+      final savedPath = await uploadImage(image, 'avatars', currentUser.email!);
       await usersCollection.doc(currentUser.email).update({
         'profileImagePath': savedPath,
-      }).timeout(const Duration(seconds: 5));
+      }).timeout(const Duration(seconds: 15));
 
       if (mounted) {
         setState(() => _localProfileImagePath = savedPath);

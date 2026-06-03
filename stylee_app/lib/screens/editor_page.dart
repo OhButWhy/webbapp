@@ -16,6 +16,7 @@ class EditorPage extends StatefulWidget {
 class _EditorPageState extends State<EditorPage> {
   final ImagePicker _picker = ImagePicker();
   String? _selectedImagePath;
+  XFile? _selectedImage;
   String? _activeTool;
 
   Future<void> _pickImage() async {
@@ -28,7 +29,10 @@ class _EditorPageState extends State<EditorPage> {
       );
 
       if (image != null && mounted) {
-        setState(() => _selectedImagePath = image.path);
+        setState(() {
+          _selectedImage = image;
+          _selectedImagePath = image.path;
+        });
       }
     } on PlatformException catch (e) {
       if (e.code == 'already_active') return;
@@ -45,12 +49,13 @@ class _EditorPageState extends State<EditorPage> {
   }
 
   void _goToPreview() {
-    if (_selectedImagePath == null) return;
+    if (_selectedImage == null) return;
     
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => PostPreviewPage(
+          image: _selectedImage!,
           imagePath: _selectedImagePath!,
           onFinish: widget.onFinish,
         ),
