@@ -495,9 +495,10 @@ def health() -> dict[str, str]:
 def marketplace_search_by_image(
     payload: MarketplaceSearchPayload,
 ) -> dict[str, Any]:
-    # if real pipeline enabled via env var, try to run it
+    # Real marketplace pipeline is enabled by default; set
+    # REAL_MARKETPLACE_ENABLED=0 to force the lightweight stub instead.
     try:
-        if os.environ.get('REAL_MARKETPLACE_ENABLED', '0') == '1':
+        if os.environ.get('REAL_MARKETPLACE_ENABLED', '1') != '0':
             from marketplace_real import real_search_by_image
 
             results = real_search_by_image(

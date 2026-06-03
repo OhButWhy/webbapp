@@ -60,10 +60,22 @@ class _UserGateState extends State<UserGate> {
       final profile = await _backend.getProfile(user.email!);
       hasTestResult = profile['testResult'] != null || profile['hasCompletedTest'] == true;
     } catch (_) {
-      final snapshot = await FirebaseFirestore.instance.collection('Users').doc(user.email).get();
-      final data = snapshot.data();
-      hasTestResult = data?['testResult'] != null || data?['hasCompletedTest'] == true;
+      // Backend unreachable — fall back to Firestore below.
     }
+
+    // Even if the backend responded but has no test result (e.g. its DB was
+    // reset), trust Firestore so an already-onboarded user is not forced to
+    // retake the quiz.
+    if (!hasTestResult) {
+      try {
+        final snapshot = await FirebaseFirestore.instance.collection('Users').doc(user.email).get();
+        final data = snapshot.data();
+        hasTestResult = data?['testResult'] != null || data?['hasCompletedTest'] == true;
+      } catch (_) {
+        // ignore Firestore errors and keep hasTestResult as is
+      }
+    }
+    if (!mounted) return;
     setState(() {
       _loading = false;
       _hasTestResult = hasTestResult;
@@ -75,7 +87,14 @@ class _UserGateState extends State<UserGate> {
   void _onTestComplete(TestResult result) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    await _backend.saveTestResult(user.email!, result.toMap());
+    // Persist to the backend, but don't let a backend outage prevent the
+    // result from being stored in Firestore (otherwise the user is sent back
+    // to the quiz on the next login).
+    try {
+      await _backend.saveTestResult(user.email!, result.toMap());
+    } catch (_) {
+      // ignore backend failure; Firestore below is the durable fallback
+    }
     await FirebaseFirestore.instance.collection('Users').doc(user.email).set({
       'hasCompletedTest': true,
       'testResult': result.toMap(),
