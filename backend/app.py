@@ -229,6 +229,7 @@ def get_profile_payload(conn: sqlite3.Connection, email: str) -> dict[str, Any]:
         "profileImagePath": user["profile_image_path"],
         "createdAt": user["created_at"],
         "testResult": test_result,
+        "hasCompletedTest": test_result is not None,
         "favoriteImages": fetch_favorites(conn, email),
         "dislikes": fetch_dislikes(conn, email),
     }
@@ -378,6 +379,26 @@ def call_openrouter(system_prompt: str, user_message: str, image_base64: Optiona
         raise last_error
 
     raise HTTPException(status_code=502, detail="OpenRouter request failed")
+
+
+def build_openrouter_fallback_response(user_message: str, image_base64: Optional[str] = None) -> str:
+    if image_base64:
+        return (
+            "ИИ-стилист временно недоступен из-за ошибки авторизации у провайдера. "
+            "По фото я бы советовал сфокусироваться на силуэте, цветовой гармонии и посадке. "
+            "Если пришлёшь короткое описание образа, я помогу собрать конкретные сочетания вручную."
+        )
+
+    message = (user_message or "").strip().lower()
+    if any(keyword in message for keyword in ["цвет", "color", "палит", "тон"]):
+        return (
+            "ИИ-стилист временно недоступен из-за ошибки авторизации у провайдера. "
+            "По цветам обычно лучше держать базу из 2-3 нейтральных оттенков и один акцентный цвет."
+        )
+    return (
+        "ИИ-стилист временно недоступен из-за ошибки авторизации у провайдера. "
+        "Опиши образ текстом, и я помогу подобрать сочетания вручную."
+    )
 
 def build_marketplace_stub_results(seed_query: str) -> list[dict[str, str]]:
     encoded = urllib.parse.quote_plus(seed_query or "стильная одежда")
@@ -781,12 +802,19 @@ def ai_chat(payload: AiChatPayload) -> dict[str, Any]:
         dislikes = profile.get("dislikes") or []
         system_prompt = build_system_prompt(profile, dislikes)
 
-        response_text, used_model = call_openrouter(
-            system_prompt=system_prompt,
-            user_message=payload.message,
-            image_base64=payload.imageBase64,
-            image_mime_type=payload.imageMimeType,
-        )
+        try:
+            response_text, used_model = call_openrouter(
+                system_prompt=system_prompt,
+                user_message=payload.message,
+                image_base64=payload.imageBase64,
+                image_mime_type=payload.imageMimeType,
+            )
+        except HTTPException as error:
+            if error.status_code in {401, 403}:
+                response_text = build_openrouter_fallback_response(payload.message, payload.imageBase64)
+                used_model = "fallback/openrouter-unavailable"
+            else:
+                raise
 
         user_created_at = now_iso()
         user_message_id = uuid.uuid4().hex

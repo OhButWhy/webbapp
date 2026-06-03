@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:stylee_app/auth/login_or_register.dart';
 import 'package:stylee_app/screens/home_page.dart';
@@ -53,11 +54,19 @@ class _UserGateState extends State<UserGate> {
       });
       return;
     }
-    await _backend.bootstrapUser(user.email!);
-    final profile = await _backend.getProfile(user.email!);
+    bool hasTestResult = false;
+    try {
+      await _backend.bootstrapUser(user.email!);
+      final profile = await _backend.getProfile(user.email!);
+      hasTestResult = profile['testResult'] != null || profile['hasCompletedTest'] == true;
+    } catch (_) {
+      final snapshot = await FirebaseFirestore.instance.collection('Users').doc(user.email).get();
+      final data = snapshot.data();
+      hasTestResult = data?['testResult'] != null || data?['hasCompletedTest'] == true;
+    }
     setState(() {
       _loading = false;
-      _hasTestResult = profile['testResult'] != null;
+      _hasTestResult = hasTestResult;
     });
   }
 
@@ -67,6 +76,10 @@ class _UserGateState extends State<UserGate> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     await _backend.saveTestResult(user.email!, result.toMap());
+    await FirebaseFirestore.instance.collection('Users').doc(user.email).set({
+      'hasCompletedTest': true,
+      'testResult': result.toMap(),
+    }, SetOptions(merge: true));
     // После сохранения результата теста — возвращаем пользователя в основной flow
     if (mounted) {
       Navigator.of(context).pushReplacement(
