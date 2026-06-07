@@ -24,6 +24,7 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
 
   bool _isLoading = true;
   String? _error;
+  String? _source;
   List<MarketplaceResult> _results = const [];
 
   @override
@@ -36,6 +37,7 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
     setState(() {
       _isLoading = true;
       _error = null;
+      _source = null;
     });
 
     try {
@@ -47,9 +49,12 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
         query: widget.queryHint,
       );
 
-      print('[MarketplaceSearch] Raw response length: ${response.length}');
+      final results = response['results'] as List<Map<String, dynamic>>? ?? [];
+      final source = response['source'] as String? ?? 'unknown';
       
-      final parsed = response
+      print('[MarketplaceSearch] Response source: $source, results count: ${results.length}');
+      
+      final parsed = results
           .map(MarketplaceResult.fromMap)
           .where((item) => item.url.isNotEmpty)
           .take(10)
@@ -63,6 +68,7 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
       if (!mounted) return;
       setState(() {
         _results = parsed;
+        _source = source;
         _isLoading = false;
       });
     } catch (e) {
@@ -115,7 +121,25 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Marketplace Search'),
+        title: Row(
+          children: [
+            const Text('Marketplace Search'),
+            if (_source != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _source == 'real' ? Colors.green : Colors.orange,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _source!,
+                  style: const TextStyle(fontSize: 11, color: Colors.white),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
       body: _buildBody(),
     );
@@ -158,8 +182,17 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
     }
 
     if (_results.isEmpty) {
-      return const Center(
-        child: Text('Нет результатов поиска'),
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Нет результатов поиска'),
+            if (_source != null) ...[
+              const SizedBox(height: 8),
+              Text('Source: $_source', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            ],
+          ],
+        ),
       );
     }
 

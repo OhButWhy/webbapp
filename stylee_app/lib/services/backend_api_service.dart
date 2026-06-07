@@ -186,7 +186,7 @@ class BackendApiService {
     return data['systemPrompt']?.toString() ?? '';
   }
 
-  Future<List<Map<String, dynamic>>> searchMarketplaceByImage({
+  Future<Map<String, dynamic>> searchMarketplaceByImage({
     String? imageUrl,
     String? imagePath,
     String? query,
@@ -198,7 +198,10 @@ class BackendApiService {
     };
     print('[BackendApi] marketplace request body: $body');
     final data = await _post('/marketplace/search-by-image', body);
-    print('[BackendApi] marketplace response: ${data.keys}, results count: ${(data['results'] as List?)?.length ?? 0}');
-    return List<Map<String, dynamic>>.from(data['results'] ?? const []);
+    print('[BackendApi] marketplace response: ${data.keys}, results count: ${(data['results'] as List?)?.length ?? 0}, source: ${data['source']}');
+    return {
+      'results': List<Map<String, dynamic>>.from(data['results'] ?? const []),
+      'source': data['source'] ?? 'unknown',
+    };
   }
 }
