@@ -39,17 +39,26 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
     });
 
     try {
+      print('[MarketplaceSearch] Starting search with: imageUrl=${widget.imageUrl}, queryHint=${widget.queryHint}');
+      
       final response = await _backend.searchMarketplaceByImage(
         imageUrl: widget.imageUrl,
         imagePath: widget.imagePath,
         query: widget.queryHint,
       );
 
+      print('[MarketplaceSearch] Raw response length: ${response.length}');
+      
       final parsed = response
           .map(MarketplaceResult.fromMap)
           .where((item) => item.url.isNotEmpty)
           .take(10)
           .toList();
+
+      print('[MarketplaceSearch] Parsed results: ${parsed.length}');
+      if (parsed.isNotEmpty) {
+        print('[MarketplaceSearch] First result: ${parsed.first.title}');
+      }
 
       if (!mounted) return;
       setState(() {
@@ -57,6 +66,7 @@ class _MarketplaceSearchScreenState extends State<MarketplaceSearchScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      print('[MarketplaceSearch] Error: $e');
       if (!mounted) return;
       setState(() {
         _error = 'Не удалось получить результаты: $e';

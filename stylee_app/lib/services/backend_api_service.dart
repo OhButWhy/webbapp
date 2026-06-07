@@ -188,11 +188,14 @@ class BackendApiService {
     String? imagePath,
     String? query,
   }) async {
-    final data = await _post('/marketplace/search-by-image', {
+    final body = {
       'imageUrl': imageUrl,
       'imagePath': imagePath,
       'query': query,
-    });
+    };
+    print('[BackendApi] marketplace request body: $body');
+    final data = await _post('/marketplace/search-by-image', body);
+    print('[BackendApi] marketplace response: ${data.keys}, results count: ${(data['results'] as List?)?.length ?? 0}');
     return List<Map<String, dynamic>>.from(data['results'] ?? const []);
   }
 }
