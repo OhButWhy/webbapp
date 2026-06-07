@@ -8,9 +8,12 @@ class BackendApiService {
 
   static final BackendApiService instance = BackendApiService._();
 
-  final String _baseUrl = dotenv.env['STYLEE_BACKEND_URL']?.trim().isNotEmpty == true
-      ? dotenv.env['STYLEE_BACKEND_URL']!.trim()
-      : 'http://127.0.0.1:8000';
+  final String _baseUrl = (() {
+    final envUrl = dotenv.env['STYLEE_BACKEND_URL']?.trim();
+    final url = (envUrl != null && envUrl.isNotEmpty) ? envUrl : 'http://127.0.0.1:8000';
+    print('[BackendApi] Using backend URL: $url');
+    return url;
+  })();
 
   Uri _uri(String path, [Map<String, String>? queryParameters]) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
