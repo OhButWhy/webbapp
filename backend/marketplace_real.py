@@ -397,7 +397,9 @@ def build_queries(caption: str | None, colors: list[str]) -> list[str]:
             queries.append(color)
     queries.append('стильная одежда')
     queries.append('модная одежда')
-    return list(dict.fromkeys(q for q in queries if q))
+    result = list(dict.fromkeys(q for q in queries if q))
+    logger.info(f"build_queries: caption='{caption}', colors={colors}, result={result}")
+    return result
 
 
 def parse_search_results_from_html(html: str, domain_hint: str) -> list[dict]:
@@ -541,6 +543,8 @@ def real_search_by_image(
 
     colors = extract_dominant_colors(image_bytes) if image_bytes else []
     queries = build_queries(query, colors)
+    
+    logger.info(f"real_search_by_image: imageUrl={imageUrl}, query={query}, colors={colors}, queries={queries}")
 
     all_candidates: List[Dict] = []
     seen_urls = set()
