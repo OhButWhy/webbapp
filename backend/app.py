@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -16,6 +18,14 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+
+# Configure logging
+logger = logging.getLogger("backend")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    logger.addHandler(handler)
 
 ROOT_DIR = Path(__file__).resolve().parent
 DATA_DIR = ROOT_DIR / "data"
@@ -491,34 +501,80 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/marketplace/status")
+def marketplace_status() -> dict[str, Any]:
+    """
+    Diagnostic endpoint to check marketplace search configuration.
+    """
+    real_enabled = os.environ.get('REAL_MARKETPLACE_ENABLED', '1')
+    
+    # Check if marketplace_real module can be imported
+    module_ok = False
+    module_error = None
+    try:
+        from marketplace_real import real_search_by_image
+        module_ok = True
+    except Exception as exc:
+        module_error = f"{type(exc).__name__}: {exc}"
+    
+    # Check dependencies
+    deps = {}
+    for name, import_name in [
+        ('curl_cffi', 'curl_cffi'),
+        ('playwright', 'playwright'),
+        ('beautifulsoup4', 'bs4'),
+        ('imagehash', 'imagehash'),
+    ]:
+        try:
+            __import__(import_name)
+            deps[name] = 'ok'
+        except ImportError:
+            deps[name] = 'missing'
+    
+    return {
+        "real_enabled": real_enabled == '1',
+        "module_loadable": module_ok,
+        "module_error": module_error,
+        "dependencies": deps,
+        "cache_exists": (ROOT_DIR / "data" / "marketplace_real_cache.json").exists(),
+    }
+
+
 @app.post("/marketplace/search-by-image")
 def marketplace_search_by_image(
     payload: MarketplaceSearchPayload,
 ) -> dict[str, Any]:
-    # Real marketplace pipeline is enabled by default; set
-    # REAL_MARKETPLACE_ENABLED=0 to force the lightweight stub instead.
-    try:
-        if os.environ.get('REAL_MARKETPLACE_ENABLED', '1') != '0':
+    """
+    Search for products on marketplaces (Wildberries).
+    
+    Real search is enabled by default (REAL_MARKETPLACE_ENABLED=1).
+    Falls back to stub results if real search fails or returns empty.
+    """
+    real_enabled = os.environ.get('REAL_MARKETPLACE_ENABLED', '1')
+    logger.info(f"Marketplace search request: query='{payload.query}', imageUrl={bool(payload.imageUrl)}, real_enabled={real_enabled}")
+    
+    # Try real marketplace search if enabled
+    if real_enabled == '1':
+        try:
+            logger.info("Attempting real marketplace search...")
             from marketplace_real import real_search_by_image
 
             results = real_search_by_image(
                 payload.imageUrl, payload.imagePath, payload.query, max_results=10
             )
-            # If real pipeline produced results, return them. Otherwise fall back to stub.
+            
+            # If real pipeline produced results, return them
             if results and len(results) > 0:
+                logger.info(f"Real search returned {len(results)} results")
                 return {"results": results, "source": "real", "count": len(results)}
             else:
-                import logging
-
-                logging.getLogger("backend").info(
-                    "real_search_by_image returned 0 results — falling back to stub"
-                )
-    except Exception:
-        import logging
-
-        logging.getLogger("backend").exception(
-            "real_search_by_image failed — falling back to stub"
-        )
+                logger.warning("Real search returned empty results — falling back to stub")
+        except Exception as exc:
+            logger.error(f"Real search failed with exception: {type(exc).__name__}: {exc}")
+    else:
+        logger.info("Real marketplace search is disabled (REAL_MARKETPLACE_ENABLED=0)")
+    
+    # Build fallback stub results
     seed_parts: list[str] = []
     if payload.query:
         seed_parts.append(payload.query.strip())
@@ -530,6 +586,8 @@ def marketplace_search_by_image(
     seed_query = (
         " ".join(part for part in seed_parts if part).strip() or "стильная одежда"
     )
+    
+    logger.info(f"Using stub results with seed query: '{seed_query}'")
     results = build_marketplace_stub_results(seed_query)[:10]
 
     # Ensure stub results include scoring fields for consistent frontend handling
@@ -542,6 +600,7 @@ def marketplace_search_by_image(
         item.setdefault('thumbnail', None)
         normalized.append(item)
 
+    logger.info(f"Returning {len(normalized)} stub results")
     return {
         "results": normalized,
         "source": "stub",
