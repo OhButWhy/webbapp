@@ -3,12 +3,185 @@
 
 ## Содержание
 
-1. [Краткий курс Dart для знающих C/Python](#1-краткий-курс-dart-для-знающих-cpython)
-2. [Основы Flutter](#2-основы-flutter)
-3. [Общая архитектура проекта](#3-общая-архитектура-проекта)
-4. [Хронология коммитов](#4-хронология-коммитов)
-5. [Ключевые функции и их реализация](#5-ключевые-функции-и-их-реализация)
-6. [Схема архитектуры](#6-схема-архитектуры)
+1. [Глоссарий технических терминов](#0-глоссарий-технических-терминов)
+2. [Краткий курс Dart для знающих C/Python](#1-краткий-курс-dart-для-знающих-cpython)
+3. [Основы Flutter](#2-основы-flutter)
+4. [Общая архитектура проекта](#3-общая-архитектура-проекта)
+5. [Хронология коммитов](#4-хронология-коммитов)
+6. [Ключевые функции и их реализация](#5-ключевые-функции-и-их-реализация)
+7. [Схема архитектуры](#6-схема-архитектуры)
+
+---
+
+## 0. Глоссарий технических терминов
+
+### A
+
+**API (Application Programming Interface)** — интерфейс программирования приложений. Набор правил и протоколов для взаимодействия между программами. В нашем случае Flutter-приложение общается с Python-бэкендом через REST API: отправляет HTTP-запросы и получает ответы в формате JSON.
+
+**async/await** — механизм асинхронного программирования. Позволяет выполнять длительные операции (сетевые запросы, чтение файлов) без блокировки основного потока. `async` помечает функцию как асинхронную, `await` приостанавливает выполнение до получения результата.
+
+### B
+
+**Backend (бэкенд)** — серверная часть приложения, которая работает "за кулисами": обрабатывает данные, общается с базой данных, выполняет бизнес-логику. В нашем проекте это Python-приложение на FastAPI.
+
+**Bearer Token** — способ авторизации API-запросов. Ключ (токен) передаётся в заголовке `Authorization: Bearer <token>`. Стандартный формат для HTTP API.
+
+### C
+
+**cURL** — инструмент командной строки для выполнения HTTP-запросов. `curl_cffi` — библиотека Python, которая имитирует браузер (impersonate Chrome) для обхода защиты от ботов.
+
+### D
+
+**Dart** — язык программирования, созданный Google. Используется во Flutter для разработки кроссплатформенных приложений (iOS, Android, Web, Desktop).
+
+**Deployment (деплой)** — развёртывание приложения на сервере или в облаке, чтобы оно было доступно пользователям.
+
+**Docker** — платформа для контейнеризации приложений. Позволяет упаковать приложение со всеми зависимостями в "контейнер", который можно запустить где угодно.
+
+### F
+
+**FastAPI** — современный Python-фреймворк для создания веб-сервисов и REST API. Автоматически генерирует документацию, валидирует данные, поддерживает асинхронность.
+
+**Firestore** — облачная NoSQL база данных от Firebase. Хранит данные в виде коллекций документов (документ = запись, коллекция = таблица). Поддерживает real-time обновления.
+
+**Flask** — лёгкий Python-фреймворк для веб-приложений (в отличие от FastAPI, более простой, но меньше возможностей "из коробки").
+
+**Frontend (фронтенд)** — пользовательский интерфейс приложения. В нашем проекте это Flutter-приложение, которое видит пользователь.
+
+### G
+
+**Generic (дженерики)** — механизм параметризации типов в языках программирования. `List<String>` означает "список строк", `Map<String, int>` — "словарь со строковыми ключами и целыми значениями".
+
+**Git** — система контроля версий. Позволяет отслеживать изменения в коде, создавать ветки, сливать изменения.
+
+**GitHub** — платформа для хостинга Git-репозиториев и совместной разработки.
+
+**gRPC** — высокопроизводительный протокол удалённого вызова процедур. Быстрее REST, но сложнее в настройке.
+
+### H
+
+**HTML (HyperText Markup Language)** — язык разметки веб-страниц. Парсеры маркетплейсов загружают HTML-страницы и извлекают из них информацию о товарах.
+
+**HTTP (HyperText Transfer Protocol)** — протокол передачи данных в интернете. Клиент (приложение) отправляет запрос, сервер возвращает ответ.
+
+**HTTPS** — защищённая версия HTTP с шифрованием (SSL/TLS).
+
+### I
+
+**Impersonate (имитация браузера)** — техника, при которой HTTP-клиент представляется браузером (Chrome, Firefox), чтобы обойти защиту сайтов от ботов.
+
+### J
+
+**JSON (JavaScript Object Notation)** — текстовый формат для хранения и обмена данными. Легко читается человеком и машинами. Пример: `{"name": "Alice", "age": 30}`.
+
+### L
+
+**Lambda (лямбда-функция)** — анонимная функция, которую можно передать как аргумент. В Dart: `(x) => x * 2`. В Python: `lambda x: x * 2`.
+
+**Linter** — инструмент для статического анализа кода. Проверяет стиль, ошибки, потенциальные проблемы без выполнения кода.
+
+### M
+
+**Middleware (мидлвар)** — промежуточное ПО, которое обрабатывает запросы до того, как они дойдут до обработчика. В FastAPI используется для CORS, аутентификации, логирования.
+
+**Mixin** — механизм повторного использования кода в классах. Позволяет "вмешать" методы из одного класса в другой без наследования.
+
+### N
+
+**Null safety** — система типов, которая защищает от ошибок null reference (обращение к несуществующему объекту). В Dart: `String?` может быть null, `String` — не может.
+
+**NoSQL** — тип баз данных, которые не используют традиционные таблицы SQL. Firestore — документо-ориентированная NoSQL база данных.
+
+### O
+
+**OAuth** — протокол авторизации, позволяющий пользователям предоставлять доступ к своим данным сторонним приложениям без передачи пароля.
+
+**Ozon** — крупнейший российский маркетплейс. Имеет свой API для партнёров и парсит HTML-страницы поиска.
+
+### P
+
+**Parse/Parsing (парсинг)** — извлечение структурированных данных из неструктурированных источников (HTML-страниц, JSON, текста).
+
+**pHash (Perceptual Hash)** — перцептивный хэш — алгоритм, который создаёт "отпечаток" изображения на основе его визуального содержания. Похожие изображения дают похожие хэши, что позволяет сравнивать их.
+
+**Playwright** — инструмент для автоматизации браузера. Может загружать страницы с JavaScript, заполнять формы, кликать. Используется как запасной вариант для парсинга сложных сайтов.
+
+**Prometheus** — система мониторинга и алертинга.
+
+**Proxy (прокси)** — промежуточный сервер, который перенаправляет запросы. Используется для обхода блокировок или скрытия реального IP-адреса.
+
+**pubspec.yaml** — файл конфигурации Flutter-проекта. Содержит зависимости (библиотеки), метаданные, версии.
+
+### Q
+
+**Query (запрос)** — запрос к базе данных. В Firestore: `collection('Users').where('age', isGreaterThan: 18)` — найти пользователей старше 18.
+
+### R
+
+**REST API** — архитектурный стиль для создания веб-сервисов. Использует стандартные HTTP-методы: GET (получение), POST (создание), PUT (обновление), DELETE (удаление).
+
+**Runtime** — время выполнения программы. В отличие от "compile time" (время компиляции).
+
+### S
+
+**Scrapping/Scraping** — автоматическое извлечение данных с веб-сайтов. "Скрапинг погоды" = извлечение данных о погоде с сайта.
+
+**SDK (Software Development Kit)** — набор инструментов для разработки. Flutter SDK включает компилятор, отладчик, библиотеки.
+
+**Singleton (синглтон)** — паттерн проектирования, при котором существует только один экземпляр класса. `FirebaseFirestore.instance` — единственный экземпляр Firestore.
+
+**SQL (Structured Query Language)** — язык запросов к реляционным базам данных. SQLite — лёгкая SQL-база данных, работающая в одном файле.
+
+**State (состояние)** — данные, которые могут изменяться во время работы приложения. При изменении состояния UI перерисовывается.
+
+**Stateless/Stateful** — StatelessWidget не имеет состояния (не меняется), StatefulWidget имеет состояние (может меняться).
+
+**Stealth (антидетекция)** — техники сокрытия признаков автоматизации (бот-детекции), чтобы сайт не мог определить, что запросы делает бот, а не человек.
+
+### T
+
+**Token** — специальная строка, используемая для аутентификации. Может истекать, быть отозван.
+
+**TypeScript** — надмножество JavaScript с статической типизацией.
+
+### U
+
+**UI (User Interface)** — пользовательский интерфейс. Всё то, что видит пользователь: кнопки, экраны, формы.
+
+**URI (Uniform Resource Identifier)** — универсальный идентификатор ресурса. URL — частный случай URI.
+
+### W
+
+**Webhook** — механизм уведомления о событиях. Когда происходит действие, сервер отправляет HTTP-запрос на указанный URL.
+
+**Widget** — базовый строительный блок UI в Flutter. Всё на экране — виджет: кнопки, текст, изображения, даже целые экраны.
+
+**Wildberries (WB)** — крупнейший российский маркетплейс. Имеет API для партнёров и открытое API поиска.
+
+### Y
+
+**YAML (YAML Ain't Markup Language)** — формат данных, читаемый человеком. Используется в конфигурационных файлах (`pubspec.yaml`, GitHub Actions).
+
+---
+
+### Быстрый справочник: REST API vs GraphQL
+
+| Аспект | REST API | GraphQL |
+|--------|----------|---------|
+| Формат | JSON, XML | JSON |
+| Запрос данных | Разные эндпоинты | Один эндпоинт, гибкие запросы |
+| Пример | `GET /users/1`, `GET /posts` | `query { user(id: 1) { name posts { title } } }` |
+| Кэширование | Простое (по URL) | Сложнее |
+
+### Быстрый справочник: SQL vs NoSQL
+
+| Аспект | SQL (PostgreSQL, MySQL) | NoSQL (Firestore, MongoDB) |
+|--------|--------------------------|----------------------------|
+| Структура | Таблицы со строгой схемой | Документы с гибкой схемой |
+| Запросы | Сложные JOIN, агрегации | Простые запросы, фильтрация |
+| Масштабирование | Вертикальное | Горизонтальное |
+| Транзакции | Полные ACID | Ограниченные |
 
 ---
 
@@ -1420,76 +1593,639 @@ class DislikeButton extends StatefulWidget {
 
 **Описание**: Миграция с Firebase Cloud Functions на Python FastAPI бэкенд.
 
+Это один из ключевых коммитов проекта. До этого момента backend работал через Firebase Cloud Functions (серверные функции в облаке Google). Этот коммит заменяет их на собственный Python-сервер на FastAPI.
+
+**Почему миграция?**
+
+| Аспект | Firebase Cloud Functions | FastAPI |
+|--------|--------------------------|---------|
+| Стоимость | Платно за каждый вызов | Оплачивается только сервер |
+| Гибкость | Ограничена Firebase | Полная свобода |
+| Сложность | Нужно знать Firebase SDK | Стандартный Python |
+| SQLite | Нет | Есть |
+| WebSocket | Ограничен | Полная поддержка |
+
+---
+
 **Новые файлы**:
+
 ```python
 # backend/app.py (682 строки)
+# ============================================================================
+# ЧТО ТАКОЕ FastAPI?
+# ============================================================================
+# FastAPI — это современный Python-фреймворк для создания веб-приложений
+# и REST API. Он автоматически:
+# - Генерирует документацию (Swagger UI) по адресу /docs
+# - Валидирует входные данные
+# - Поддерживает асинхронность (async/await)
+# - Возвращает JSON ответы
+#
+# АНАЛОГИЯ:
+# - Flask/Django — другие Python-фреймворки, но без автодокументации
+# - Express.js — аналог в JavaScript/Node.js
+# ============================================================================
+
 from fastapi import FastAPI, HTTPException, Query
+# Импортируем FastAPI и инструменты для работы с HTTP
+# FastAPI — класс приложения
+# HTTPException — для возврата ошибок HTTP (400, 404, 500)
+# Query — для параметров запроса в URL (?page=1)
+
 from fastapi.middleware.cors import CORSMiddleware
+# CORS — Cross-Origin Resource Sharing
+# Позволяет браузеру запрашивать данные с другого домена
+# Без этого Flutter-приложение не сможет обращаться к бэкенду!
+
+# ============================================================================
+# СОЗДАНИЕ ПРИЛОЖЕНИЯ
+# ============================================================================
+# app = FastAPI(...) — создаём экземпляр веб-приложения
+# title= — название для документации
+# lifespan= — функция выполняется при старте/остановке сервера
 
 app = FastAPI(title="Stylee Python Backend")
 
-# Основные эндпоинты:
-# - /api/profile/upsert - создание/обновление профиля
-# - /api/profile/{email} - получение профиля
-# - /api/test-result - сохранение результатов квиза
-# - /api/ai/chat - ИИ-чат
-# - /api/favorites - избранное
-# - /api/dislikes - дизлайки
+# ============================================================================
+# CORS MIDDLEWARE — разрешаем запросы с любых доменов
+# ============================================================================
+# Это КРИТИЧЕСКИ важно для Flutter!
+# Без этого браузер заблокирует запросы от приложения к серверу
+# because 'Access-Control-Allow-Origin' header is missing
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],      # Разрешить запросы с ЛЮБОГО домена
+    allow_credentials=True,   # Разрешить cookies/авторизацию
+    allow_methods=["*"],     # Разрешить все HTTP-методы (GET, POST...)
+    allow_headers=["*"],      # Разрешить все заголовки
+)
 ```
 
-**Модели данных**:
-```python
-class ProfileUpsert(BaseModel):
-    username: str
-    bio: str = ""
-    profile_image_path: Optional[str] = None
+---
 
-class TestResultPayload(BaseModel):
-    height: Optional[float] = None
-    bust: Optional[float] = None
-    waist: Optional[float] = None
-    hips: Optional[float] = None
-    city: Optional[str] = None
-    preferredStyles: list[str] = []
-    favoriteColors: list[str] = []
-    avoidedColors: list[str] = []
-    fitPreference: Optional[str] = None
-    specialNotes: Optional[str] = None
+**Основные эндпоинты API:**
+
+```
+HTTP Метод + URL                    → Что делает
+─────────────────────────────────────────────────────────────
+GET  /api/profile/{email}           → Получить профиль пользователя
+POST /api/profile/upsert           → Создать или обновить профиль
+POST /api/test-result               → Сохранить результаты квиза
+GET  /api/test-result/{email}      → Получить результаты квиза
+POST /api/favorites                 → Добавить в избранное
+GET  /api/favorites/{email}        → Получить избранное
+POST /api/dislikes                  → Добавить дизлайк
+GET  /api/dislikes/{email}         → Получить дизлайки
+POST /api/ai/chat                   → Отправить сообщение ИИ
+GET  /api/marketplace/search        → Поиск товаров на маркетплейсах
+GET  /health                        → Проверка работоспособности
 ```
 
-**База данных SQLite**:
-```python
-def init_db() -> None:
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            email TEXT PRIMARY KEY,
-            username TEXT,
-            bio TEXT DEFAULT '',
-            profile_image_path TEXT,
-            created_at TEXT NOT NULL,
-            test_result_json TEXT
-        );
-        
-        CREATE TABLE IF NOT EXISTS favorite_images (
-            user_email TEXT NOT NULL,
-            image_url TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            PRIMARY KEY (user_email, image_url)
-        );
-    """)
-```
+**Примеры запросов:**
 
-**Изменения во Flutter**:
-```dart
-// stylee_app/lib/services/backend_api_service.dart (новый)
-class BackendApiService {
-  static final instance = BackendApiService();
-  
-  Future<void> upsertProfile(...) async {...}
-  Future<TestResult?> getTestResult(...) async {...}
-  Future<void> saveDislike(...) async {...}
+```bash
+# Получить профиль пользователя
+GET http://localhost:8000/api/profile/alice@example.com
+
+# Ответ:
+{
+  "email": "alice@example.com",
+  "username": "Alice",
+  "bio": "Люблю минимализм",
+  "profile_image_path": "/images/alice.jpg",
+  "created_at": "2026-04-01T10:00:00Z",
+  "test_result_json": "{\"height\": 170, \"favoriteColors\": [\"чёрный\", \"белый\"]}"
+}
+
+# Создать/обновить профиль
+POST http://localhost:8000/api/profile/upsert
+Content-Type: application/json
+
+{
+  "username": "Alice",
+  "bio": "Обновлённая биография"
 }
 ```
+
+---
+
+**Модели данных (Pydantic):**
+
+```python
+# ============================================================================
+# ЧТО ТАКОЕ Pydantic?
+# ============================================================================
+# Pydantic — библиотека для валидации данных
+# Модель (класс с типами) автоматически:
+# - Проверяет входные данные
+# - Преобразует JSON в объекты Python
+# - Генерирует документацию
+#
+# ПРИМЕР:
+# Если придёт {"username": 123}, Pydantic выдаст ошибку
+# (число вместо строки)
+# ============================================================================
+
+from pydantic import BaseModel, Field
+# BaseModel — базовый класс для всех моделей
+# Field — для дополнительных настроек полей (описание, дефолт)
+
+class ProfileUpsert(BaseModel):
+    """Модель для создания/обновления профиля пользователя"""
+    
+    # Поля без значения по умолчанию — ОБЯЗАТЕЛЬНЫЕ
+    # (required в терминах Pydantic)
+    username: str           # Строка, обязательно
+    
+    # Поля с = значение — необязательные
+    # Если клиент не передаст, будет использоваться значение по умолчанию
+    bio: str = ""                    # Пустая строка по умолчанию
+    profile_image_path: str | None = None  # Может быть None (nullable)
+
+class TestResultPayload(BaseModel):
+    """Результаты квиза по определению стиля пользователя"""
+    
+    # Optional[float] = может быть числом или None
+    # (аналог float? в Dart)
+    height: Optional[float] = None    # Рост в см
+    bust: Optional[float] = None     # Обхват груди
+    waist: Optional[float] = None     # Обхват талии
+    hips: Optional[float] = None      # Обхват бёдер
+    city: Optional[str] = None         # Город (для погоды)
+    
+    # list[str] = список строк (аналог List<String> в Dart)
+    # Field(default_factory=list) = создавать пустой список если не передан
+    preferredStyles: list[str] = Field(default_factory=list)
+    favoriteColors: list[str] = Field(default_factory=list)
+    avoidedColors: list[str] = Field(default_factory=list)
+    
+    fitPreference: Optional[str] = None  # Предпочтение по посадке
+    specialNotes: Optional[str] = None    # Особые пожелания
+
+class DislikePayload(BaseModel):
+    """Модель дизлайка для отправки на сервер"""
+    description: str                  # Описание (обязательно)
+    category: str = "recommendation"  # Категория (дефолт = general)
+
+class FavoritePayload(BaseModel):
+    """Модель избранного изображения"""
+    imageUrl: str                      # URL изображения (обязательно)
+
+class ChatMessagePayload(BaseModel):
+    """Сообщение в чате"""
+    text: str = ""                    # Текст сообщения
+    imageBase64: Optional[str] = None  # Изображение в base64 (опционально)
+    imageMimeType: Optional[str] = None  # MIME тип изображения
+
+class AiChatPayload(BaseModel):
+    """Запрос к ИИ-стилисту"""
+    email: str                         # Email пользователя
+    chatId: Optional[str] = None       # ID чата (для контекста)
+    message: str = ""                  # Сообщение пользователя
+    imageBase64: Optional[str] = None  # Изображение (опционально)
+    imagePath: Optional[str] = None   # Путь к файлу изображения
+```
+
+---
+
+**База данных SQLite:**
+
+```python
+# ============================================================================
+# ЧТО ТАКОЕ SQLite?
+# ============================================================================
+# SQLite — лёгкая база данных, работающая в ОДНОМ ФАЙЛЕ
+# Не нужно запускать отдельный сервер (как для MySQL/PostgreSQL)
+# Идеально для небольших приложений
+#
+# ПЛЮСЫ:
+# - Простота (один файл)
+# - Быстрая работа
+# - Не требует настройки
+#
+# МИНУСЫ:
+# - Не подходит для высоких нагрузок
+# - Нет сложных JOIN (как в PostgreSQL)
+# - Один файл = одна точка отказа
+# ============================================================================
+
+import sqlite3
+# sqlite3 — встроенный модуль Python для работы с SQLite
+
+DB_PATH = "backend/data/stylee.sqlite3"
+# Путь к файлу базы данных (относительно расположения app.py)
+
+def db_connection() -> sqlite3.Connection:
+    """Создать подключение к базе данных"""
+    # sqlite3.connect() — открывает файл базы данных
+    # Если файла нет — создаст новый
+    conn = sqlite3.connect(DB_PATH)
+    
+    # conn.row_factory = sqlite3.Row
+    # Делает результаты запросов похожими на словари
+    # Вместо row[0], row[1] можно писать row['column_name']
+    conn.row_factory = sqlite3.Row
+    
+    # PRAGMA foreign_keys = ON
+    # Включает проверку внешних ключей
+    # (аналог ON DELETE CASCADE в SQL)
+    conn.execute("PRAGMA foreign_keys = ON")
+    
+    return conn
+
+def init_db() -> None:
+    """Инициализация таблиц базы данных"""
+    # Вызывается при первом запуске сервера
+    # CREATE TABLE IF NOT EXISTS — создаёт таблицу если её нет
+    
+    with db_connection() as conn:
+        conn.executescript("""
+            -- Таблица пользователей
+            CREATE TABLE IF NOT EXISTS users (
+                email TEXT PRIMARY KEY,           -- Email = ключ (уникальный)
+                username TEXT,                    -- Имя пользователя
+                bio TEXT DEFAULT '',              -- Биография (по умолчанию пусто)
+                profile_image_path TEXT,          -- Путь к фото профиля
+                created_at TEXT NOT NULL,         -- Дата создания (обязательно)
+                test_result_json TEXT             -- Результаты квиза в JSON
+            );
+            
+            -- Таблица избранных изображений
+            CREATE TABLE IF NOT EXISTS favorite_images (
+                user_email TEXT NOT NULL,         -- Email пользователя
+                image_url TEXT NOT NULL,          -- URL изображения
+                created_at TEXT NOT NULL,         -- Дата добавления
+                PRIMARY KEY (user_email, image_url)  -- Составной ключ
+            );
+            
+            -- Таблица дизлайков
+            CREATE TABLE IF NOT EXISTS dislikes (
+                user_email TEXT NOT NULL,
+                description TEXT NOT NULL,
+                category TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (user_email, description)  -- Один дизлайк на описание
+            );
+            
+            -- Таблица чатов
+            CREATE TABLE IF NOT EXISTS chats (
+                id TEXT PRIMARY KEY,
+                user_email TEXT NOT NULL,
+                title TEXT,
+                created_at TEXT NOT NULL
+            );
+            
+            -- Таблица сообщений в чатах
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                chat_id TEXT NOT NULL,
+                role TEXT NOT NULL,              -- 'user' или 'assistant'
+                content TEXT NOT NULL,           -- Текст сообщения
+                image_url TEXT,                  -- URL изображения (если было)
+                created_at TEXT NOT NULL
+            );
+        """)
+        # executescript() — выполняет несколько SQL-команд за раз
+```
+
+---
+
+**Примеры SQL запросов в коде:**
+
+```python
+# ============================================================================
+# ПОЛУЧИТЬ ПОЛЬЗОВАТЕЛЯ
+# ============================================================================
+def get_user(email: str) -> dict | None:
+    with db_connection() as conn:
+        cursor = conn.execute(
+            "SELECT * FROM users WHERE email = ?",
+            (email,)  # Параметры запроса (защита от SQL injection!)
+        )
+        row = cursor.fetchone()
+        
+        if row is None:
+            return None  # Пользователь не найден
+        
+        # row — объект sqlite3.Row (похож на dict)
+        return dict(row)  # Конвертируем в обычный dict
+
+# ============================================================================
+# СОЗДАТЬ/ОБНОВИТЬ ПОЛЬЗОВАТЕЛЯ (UPSERT)
+# ============================================================================
+def upsert_user(email: str, username: str, bio: str = "") -> None:
+    # INSERT OR REPLACE — вставить или заменить если уже есть
+    # Это "UPSERT" — combine INSERT и UPDATE
+    with db_connection() as conn:
+        conn.execute("""
+            INSERT OR REPLACE INTO users (email, username, bio, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET
+                username = excluded.username,
+                bio = excluded.bio
+        """, (email, username, bio, datetime.utcnow().isoformat()))
+        # datetime.utcnow() — текущее время в формате ISO
+        # '2026-05-01T12:00:00'
+
+# ============================================================================
+# ПОЛУЧИТЬ ИЗБРАННОЕ
+# ============================================================================
+def get_favorites(email: str) -> list[dict]:
+    with db_connection() as conn:
+        cursor = conn.execute(
+            "SELECT image_url, created_at FROM favorite_images WHERE user_email = ?",
+            (email,)
+        )
+        # fetchall() — получить все строки
+        return [dict(row) for row in cursor.fetchall()]
+
+# ============================================================================
+# ДОБАВИТЬ В ИЗБРАННОЕ
+# ============================================================================
+def add_favorite(email: str, image_url: str) -> None:
+    try:
+        with db_connection() as conn:
+            conn.execute("""
+                INSERT INTO favorite_images (user_email, image_url, created_at)
+                VALUES (?, ?, ?)
+            """, (email, image_url, datetime.utcnow().isoformat()))
+            # Если уже есть — SQLite выдаст ошибку (дубликат PRIMARY KEY)
+    except sqlite3.IntegrityError:
+        # Игнорируем ошибку "уже существует"
+        pass
+```
+
+---
+
+**Эндпоинты FastAPI (маршруты):**
+
+```python
+# ============================================================================
+# ЧТО ТАКОЕ ЭНДПОИНТ (ENDPOINT)?
+# ============================================================================
+# Эндпоинт = URL + HTTP-метод + обработчик
+# Это точка входа для API-запросов
+#
+# @app.get("/path") — декоратор, регистрирующий функцию как обработчик
+# GET-запросов на адрес /path
+# ============================================================================
+
+from fastapi import FastAPI, HTTPException, Query
+from typing import Optional
+
+# Создаём приложение (уже было выше)
+app = FastAPI(title="Stylee Python Backend")
+
+# --------------------------------------------------------------------------
+# ЭНДПОИНТ: Получить профиль пользователя
+# --------------------------------------------------------------------------
+# @app.get() — декоратор для GET запросов
+# /api/profile/{email} — {email} это параметр пути (path parameter)
+
+@app.get("/api/profile/{email}")
+async def get_profile(email: str):
+    """
+    Получить профиль пользователя по email
+    
+    Параметры:
+        - email: Email пользователя (из URL)
+    
+    Возвращает:
+        - JSON с данными профиля
+        - 404 если пользователь не найден
+    """
+    user = get_user(email)  # Функция из предыдущего раздела
+    
+    if user is None:
+        # HTTPException — выбросить HTTP-ошибку
+        # status_code=404 — "Not Found"
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    return user  # FastAPI автоматически конвертирует в JSON
+
+# --------------------------------------------------------------------------
+# ЭНДПОИНТ: Создать/обновить профиль
+# --------------------------------------------------------------------------
+# @app.post() — декоратор для POST запросов
+# Тело запроса автоматически парсится в модель ProfileUpsert
+
+@app.post("/api/profile/upsert")
+async def upsert_profile(profile: ProfileUpsert):
+    """
+    Создать или обновить профиль пользователя
+    
+    Тело запроса (JSON):
+        {
+            "username": "Alice",
+            "bio": "Моя биография"
+        }
+    """
+    # ProfileUpsert — модель Pydantic (проверена и валидирована)
+    upsert_user(
+        email=profile.username,  # Используем username как email (упрощение)
+        username=profile.username,
+        bio=profile.bio
+    )
+    
+    return {"status": "ok", "message": "Профиль сохранён"}
+
+# --------------------------------------------------------------------------
+# ЭНДПОИНТ: Получить избранное
+# --------------------------------------------------------------------------
+# {email} — параметр пути
+# response_model=list[dict] — указываем тип возвращаемого значения
+
+@app.get("/api/favorites/{email}", response_model=list[dict])
+async def get_favorites_endpoint(email: str):
+    """
+    Получить список избранных изображений пользователя
+    """
+    return get_favorites(email)
+
+# --------------------------------------------------------------------------
+# ЭНДПОИНТ: Поиск на маркетплейсах
+# --------------------------------------------------------------------------
+# Query parameters — параметры после ? в URL
+# ?query=платье&imageUrl=...
+
+@app.get("/api/marketplace/search")
+async def marketplace_search(
+    imageUrl: Optional[str] = None,
+    imagePath: Optional[str] = None,
+    query: Optional[str] = Query(None, description="Поисковый запрос")
+):
+    """
+    Поиск товаров на Wildberries и Ozon
+    
+    Параметры (Query string):
+        - imageUrl: URL изображения для визуального поиска
+        - imagePath: Путь к файлу изображения
+        - query: Текстовый поисковый запрос
+    
+    Пример запроса:
+        GET /api/marketplace/search?query=красное+платье
+    
+    Пример с изображением:
+        GET /api/marketplace/search?imageUrl=https://example.com/image.jpg
+    """
+    # Вызываем функцию поиска с pHash
+    results = real_search_by_image(
+        imageUrl=imageUrl,
+        imagePath=imagePath,
+        query=query
+    )
+    
+    return {"results": results}
+
+# --------------------------------------------------------------------------
+# ЭНДПОИНТ: Проверка работоспособности
+# --------------------------------------------------------------------------
+# Используется для мониторинга (health check)
+
+@app.get("/health")
+async def health_check():
+    """Проверка что сервер запущен"""
+    return {"status": "healthy", "service": "stylee-backend"}
+```
+
+---
+
+**Изменения во Flutter (новый сервис):**
+
+```dart
+// stylee_app/lib/services/backend_api_service.dart
+// ============================================================================
+// СЕРВИС ДЛЯ ОБЩЕНИЯ С PYTHON БЭКЕНДОМ
+// ============================================================================
+// Этот сервис заменил прямое обращение к Firebase для сложных операций
+// Теперь Flutter отправляет HTTP-запросы к Python FastAPI серверу
+// ============================================================================
+
+import 'dart:convert';      // JSON кодирование/декодирование
+import 'package:http/http.dart' as http;  // HTTP клиент
+
+class BackendApiService {
+  // --------------------------------------------------------------------------
+  // SINGLETON PATTERN — один экземпляр на всё приложение
+  // --------------------------------------------------------------------------
+  // static final — статическое поле (существует в классе, не в объекте)
+  // late — будет инициализировано при первом использовании
+  static final BackendApiService instance = BackendApiService._internal();
+  
+  // Приватный конструктор — нельзя вызвать BackendApiService()
+  BackendApiService._internal();
+  
+  // --------------------------------------------------------------------------
+  // КОНФИГУРАЦИЯ
+  // --------------------------------------------------------------------------
+  // Базовый URL сервера (из .env)
+  final String _baseUrl = dotenv.env['BACKEND_URL'] ?? 'http://localhost:8000';
+
+  // --------------------------------------------------------------------------
+  // МЕТОД: Получить профиль
+  // --------------------------------------------------------------------------
+  Future<Map<String, dynamic>?> getProfile(String email) async {
+    try {
+      // http.get — GET запрос (аналог requests.get() в Python)
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/profile/$email'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      if (response.statusCode == 200) {
+        // jsonDecode — парсинг JSON строки в Map
+        // аналог json.loads() в Python
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 404) {
+        return null;  // Пользователь не найден
+      } else {
+        throw Exception('Ошибка: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Ошибка получения профиля: $e');
+      return null;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // МЕТОД: Сохранить профиль
+  // --------------------------------------------------------------------------
+  Future<bool> upsertProfile({
+    required String email,
+    required String username,
+    String bio = '',
+  }) async {
+    try {
+      // http.post — POST запрос (аналог requests.post())
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/profile/upsert'),
+        headers: {'Content-Type': 'application/json'},
+        // body — тело запроса в виде строки
+        // jsonEncode — сериализация объекта в JSON
+        body: jsonEncode({
+          'username': username,
+          'bio': bio,
+        }),
+      );
+      
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Ошибка сохранения профиля: $e');
+      return false;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // МЕТОД: Поиск на маркетплейсах
+  // --------------------------------------------------------------------------
+  Future<List<Map<String, dynamic>>> searchMarketplace({
+    String? query,
+    String? imageUrl,
+  }) async {
+    try {
+      // Строим URL с query parameters
+      final params = <String, String>{};
+      if (query != null) params['query'] = query;
+      if (imageUrl != null) params['imageUrl'] = imageUrl;
+      
+      final uri = Uri.parse('$_baseUrl/api/marketplace/search')
+          .replace(queryParameters: params.isNotEmpty ? params : null);
+      
+      final response = await http.get(uri);
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return (data['results'] as List)
+            .cast<Map<String, dynamic>>();
+      } else {
+        return [];
+      }
+    } catch (e) {
+      print('Ошибка поиска маркетплейсов: $e');
+      return [];
+    }
+  }
+}
+```
+
+---
+
+**Ключевые концепции Python в этом коде:**
+
+| Синтаксис | Пояснение |
+|-----------|-----------|
+| `from typing import Optional` | Импорт типа Optional (может быть None) |
+| `str \| None` | Union type — строка или None (Python 3.10+) |
+| `Optional[str]` | То же что str \| None, но для старых версий |
+| `with db_connection() as conn` | Контекстный менеджер — автоматически закрывает соединение |
+| `conn.execute(sql, params)` | Выполнить SQL с параметрами (защита от injection) |
+| `cursor.fetchone()` | Получить одну строку результата |
+| `cursor.fetchall()` | Получить все строки результата |
+| `@app.get("/path")` | Декоратор — регистрация эндпоинта |
+| `async def func()` | Асинхронная функция |
+| `raise HTTPException(...)` | Выбросить HTTP ошибку |
+| `response_model=list[dict]` | Указание типа возврата для документации |
 
 ---
 
@@ -1826,63 +2562,364 @@ def parse_ozon(html: str, domain_hint: str) -> list[dict]:
 
 **Описание**: Визуальное сравнение изображений с помощью перцептивного хэширования.
 
-**Ключевые функции**:
+---
+
+**Что такое pHash и зачем он нужен?**
+
+Представьте ситуацию:
+1. Пользователь видит красивое платье в Instagram
+2. Хочет найти похожее на Wildberries
+3. Загружает скриншот в приложение
+4. Приложение должно найти ВИЗУАЛЬНО похожие товары
+
+**Как это работает без pHash?**
+- Обычный поиск по тексту: "скриншот платья" → не найдёт ничего
+- Теги/описания: работает плохо, субъективно
+
+**Как это работает с pHash?**
+1. Изображение преобразуется в числовой "отпечаток" (хеш)
+2. Похожие изображения дают похожие хеши
+3. Можно сравнить хеш пользовательского фото с хешами товаров
+4. Найти наиболее похожие
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  КАК РАБОТАЕТ pHash (Perceptual Hash)                                   │
+│                                                                         │
+│  Оригинальное изображение        Платье на Wildberries                 │
+│       ┌─────────┐                    ┌─────────┐                        │
+│       │  🖼️    │                    │  🖼️    │                        │
+│       │ платье  │                    │ платье  │                        │
+│       └────┬────┘                    └────┬────┘                        │
+│            │                              │                             │
+│            ▼                              ▼                             │
+│     Вычисление                   Вычисление                            │
+│     pHash                        pHash                                 │
+│            │                              │                             │
+│            ▼                              ▼                             │
+│     Хеш: 101010111100...          Хеш: 101010111011...                  │
+│            │                              │                             │
+│            │         Сравнение            │                             │
+│            │◄─────────────────────────────►│                            │
+│            │                              │                             │
+│            ▼                              ▼                             │
+│     Сходство: 94%                         Сходство: 94%                  │
+│            │                              │                             │
+│            │         РЕЗУЛЬТАТ            │                             │
+│            └──────────────────────────────►│                             │
+│                                          Найдено!                      │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+**Ключевые функции:**
+
 ```python
+# backend/marketplace_real.py
+# ============================================================================
+# ЗАВИСИМОСТИ
+# ============================================================================
+# imagehash — библиотека для вычисления перцептивных хэшей
+# PIL (Pillow) — библиотека для работы с изображениями
+# BeautifulSoup — парсер HTML
+
 import imagehash
 from PIL import Image
 from io import BytesIO
 
+# ============================================================================
+# ФУНКЦИЯ: Вычисление pHash изображения
+# ============================================================================
+# image_bytes — бинарные данные изображения (jpg, png, webp)
+# Возвращает — объект ImageHash
+
 def compute_phash_from_bytes(image_bytes: bytes) -> imagehash.ImageHash:
-    """Вычисление pHash изображения"""
+    """
+    Вычисление перцептивного хэша изображения
+    
+    Параметры:
+        image_bytes: Бинарные данные изображения
+    
+    Возвращает:
+        ImageHash — объект представляющий "отпечаток" изображения
+        Можно сравнивать два ImageHash оператором '-' (разница хэшей)
+    
+    Пример:
+        hash1 = compute_phash_from_bytes(bytes1)  # Фото пользователя
+        hash2 = compute_phash_from_bytes(bytes2)  # Фото товара
+        distance = hash1 - hash2  # 0-64, где 0 = идентичные
+    """
+    # BytesIO — превращает байты в "файл" в памяти
+    # Image.open() — открывает изображение
+    # .convert('RGB') — конвертирует в RGB (убирает альфа-канал)
     img = Image.open(BytesIO(image_bytes)).convert('RGB')
+    
+    # imagehash.phash() — вычисляет pHash (по умолчанию 8x8 = 64 бита)
+    # Можно: imagehash.phash(img, hash_size=16) для 16x16 = 256 бит
     return imagehash.phash(img)
 
 
+# ============================================================================
+# ФУНКЦИЯ: Сравнение двух хэшей
+# ============================================================================
+
 def visual_similarity_score(phash_a, phash_b) -> float:
-    """Сходство двух изображений (0.0 - 1.0)"""
+    """
+    Вычисление сходства двух изображений
+    
+    Параметры:
+        phash_a: Хэш первого изображения
+        phash_b: Хэш второго изображения
+    
+    Возвращает:
+        float от 0.0 до 1.0
+        1.0 = идентичные изображения
+        0.0 = абсолютно разные
+    
+    Как это работает:
+        - distance = phash_a - phash_b — разница в битах (0-64)
+        - max_bits = 64 (размер хэша)
+        - similarity = 1.0 - (distance / max_bits)
+        - distance=0  → similarity=1.0 (100%)
+        - distance=32 → similarity=0.5 (50%)
+        - distance=64 → similarity=0.0 (0%)
+    """
+    # Оператор '-' между ImageHash возвращает количество
+    # отличающихся бит (Hamming distance)
     dist = phash_a - phash_b
+    
+    # Размер хэша (8x8 = 64 бита)
     max_bits = phash_a.hash.size
+    
+    # Формула сходства
     return max(0.0, 1.0 - (dist / float(max_bits)))
 
 
+# ============================================================================
+# ФУНКЦИЯ: Загрузка миниатюры товара
+# ============================================================================
+
 def fetch_candidate_thumbnail_bytes(url: str, timeout: int = 3):
-    """Загрузка миниатюры товара с мета-тегов og:image"""
-    r = requests.get(url, headers=headers)
-    soup = BeautifulSoup(r.text, 'lxml')
+    """
+    Загрузка миниатюры товара с веб-страницы
     
-    # Приоритет: og:image > первое img
-    meta = soup.find('meta', property='og:image')
-    if meta and meta.get('content'):
-        return download_image_to_bytes(meta.get('content'))
+    Стратегия поиска изображения:
+        1. og:image — OpenGraph мета-тег (часто главное изображение)
+        2. Первое <img> на странице
+        3. Если не нашли — возвращаем None
+    
+    og:image — это мета-тег для соцсетей:
+        <meta property="og:image" content="https://example.com/image.jpg">
+        Социальные сети используют его для превью ссылок
+    """
+    try:
+        # GET запрос к странице товара
+        ua = os.environ.get('MARKETPLACE_USER_AGENT', 'Mozilla/5.0')
+        headers = {'User-Agent': ua}
+        r = requests.get(url, headers=headers, timeout=timeout)
+        r.raise_for_status()  # Выбросить ошибку если статус != 200
+        
+        # Парсим HTML
+        soup = BeautifulSoup(r.text, 'lxml')
+        
+        # Ищем og:image
+        meta = soup.find('meta', property='og:image')
+        if meta and meta.get('content'):
+            img_url = meta.get('content')
+            # Рекурсивно вызываем download_image_to_bytes
+            return download_image_to_bytes(img_url, timeout=timeout)
+        
+        # Fallback: первое <img>
+        img = soup.find('img')
+        if img and img.get('src'):
+            img_url = img.get('src')
+            # Исправляем относительные URL
+            if img_url.startswith('//'):
+                img_url = 'https:' + img_url
+            elif img_url.startswith('/'):
+                # Извлекаем домен из URL
+                from urllib.parse import urljoin
+                img_url = urljoin(url, img_url)
+            return download_image_to_bytes(img_url, timeout=timeout)
+        
+        return None  # Изображение не найдено
+        
+    except Exception:
+        return None  # Ошибка загрузки
 ```
 
-**Логика ранжирования**:
+---
+
+**Основная функция поиска:**
+
 ```python
-def real_search_by_image(imageUrl, query, max_results=10):
-    # 1. Скачиваем исходное изображение
-    source_bytes = download_image_to_bytes(imageUrl)
-    source_hash = compute_phash_from_bytes(source_bytes)
+# ============================================================================
+# ГЛАВНАЯ ФУНКЦИЯ: Поиск товаров по изображению
+# ============================================================================
+
+def real_search_by_image(
+    imageUrl: str | None,      # URL изображения пользователя
+    imagePath: str | None,     # Или путь к файлу
+    query: str | None,         # Дополнительный текстовый запрос
+    max_results: int = 10,     # Максимум результатов
+) -> list[dict]:
+    """
+    Поиск визуально похожих товаров на маркетплейсах
     
-    # 2. Получаем кандидатов с маркетплейсов
-    candidates = fetch_marketplace_candidates(query)
+    Алгоритм:
+        1. Загрузить изображение пользователя
+        2. Вычислить его pHash
+        3. Получить кандидатов с Wildberries/Ozon (по текстовому запросу)
+        4. Для каждого кандидата:
+           - Загрузить миниатюру
+           - Вычислить pHash миниатюры
+           - Сравнить с оригинальным
+        5. Отсортировать по сходству
+        6. Вернуть top-N результатов
     
-    # 3. Для каждого кандидата:
-    #    - Скачать миниатюру
-    #    - Вычислить pHash
-    #    - Сравнить с исходным
+    Возвращает:
+        Список словарей с товарами:
+        [{'title': '...', 'url': '...', 'thumbnail': '...', 'similarity': 0.94}, ...]
+    """
     
-    scored = []
+    # ─────────────────────────────────────────────────────────────────────
+    # ШАГ 1: Загружаем изображение пользователя
+    # ─────────────────────────────────────────────────────────────────────
+    
+    image_bytes = None
+    
+    if imageUrl:
+        # download_image_to_bytes — функция загрузки по URL
+        image_bytes = download_image_to_bytes(imageUrl)
+    
+    # Если не получилось по URL, пробуем локальный файл
+    if not image_bytes and imagePath:
+        try:
+            with open(imagePath, 'rb') as f:
+                image_bytes = f.read()
+        except Exception:
+            pass
+    
+    if not image_bytes:
+        return []  # Не удалось загрузить изображение
+    
+    # ─────────────────────────────────────────────────────────────────────
+    # ШАГ 2: Вычисляем pHash оригинала
+    # ─────────────────────────────────────────────────────────────────────
+    
+    try:
+        source_hash = compute_phash_from_bytes(image_bytes)
+    except Exception:
+        return []  # Не удалось вычислить хэш
+    
+    # ─────────────────────────────────────────────────────────────────────
+    # ШАГ 3: Получаем кандидатов с маркетплейсов
+    # ─────────────────────────────────────────────────────────────────────
+    
+    # fetch_marketplace_candidates — функция парсинга маркетплейсов
+    # Возвращает список товаров: [{'title': '...', 'url': '...', 'marketplace': '...'}, ...]
+    candidates = fetch_marketplace_candidates(query or "")
+    
+    if not candidates:
+        return []
+    
+    # ─────────────────────────────────────────────────────────────────────
+    # ШАГ 4: Для каждого кандидата вычисляем сходство
+    # ─────────────────────────────────────────────────────────────────────
+    
+    scored_candidates = []
+    
     for candidate in candidates:
-        thumb = fetch_candidate_thumbnail_bytes(candidate['url'])
-        if thumb:
-            cand_hash = compute_phash_from_bytes(thumb)
-            score = visual_similarity_score(source_hash, cand_hash)
-            scored.append((score, candidate))
+        try:
+            # Загружаем миниатюру товара
+            thumb_bytes = fetch_candidate_thumbnail_bytes(candidate['url'])
+            
+            if not thumb_bytes:
+                continue  # Пропускаем если не загрузилась миниатюра
+            
+            # Вычисляем pHash миниатюры
+            cand_hash = compute_phash_from_bytes(thumb_bytes)
+            
+            # Вычисляем сходство
+            similarity = visual_similarity_score(source_hash, cand_hash)
+            
+            # Добавляем в список с оценкой
+            scored_candidates.append({
+                'title': candidate['title'],
+                'url': candidate['url'],
+                'thumbnail': candidate.get('thumbnail'),
+                'marketplace': candidate.get('marketplace', 'Unknown'),
+                'similarity': similarity,  # 0.0 - 1.0
+            })
+            
+        except Exception as e:
+            # Пропускаем товар при ошибке
+            print(f"Ошибка обработки {candidate['url']}: {e}")
+            continue
     
-    # 4. Сортируем по сходству и возвращаем top-N
-    scored.sort(reverse=True)
-    return [c for _, c in scored[:max_results]]
+    # ─────────────────────────────────────────────────────────────────────
+    # ШАГ 5: Сортируем по сходству и возвращаем top-N
+    # ─────────────────────────────────────────────────────────────────────
+    
+    # sorted() с reverse=True — по убыванию сходства
+    scored_candidates.sort(key=lambda x: x['similarity'], reverse=True)
+    
+    # Берём только max_results лучших
+    return scored_candidates[:max_results]
 ```
+
+---
+
+**Пример результата:**
+
+```python
+# Результат работы real_search_by_image
+results = [
+    {
+        'title': 'Платье женское летнее миди с v-образным вырезом',
+        'url': 'https://www.wildberries.ru/catalog/12345678/detail.aspx',
+        'thumbnail': 'https://cdn.wildberries.ru/photos/12345678.jpg',
+        'marketplace': 'Wildberries',
+        'similarity': 0.94,  # Очень похоже!
+    },
+    {
+        'title': 'Платье-миди трикотажное с коротким рукавом',
+        'url': 'https://www.ozon.ru/product/87654321',
+        'thumbnail': 'https://cdn.ozon.ru/photos/87654321.jpg',
+        'marketplace': 'Ozon',
+        'similarity': 0.87,  # Похоже
+    },
+    {
+        'title': 'Юбка женская плиссе',
+        'url': 'https://www.wildberries.ru/catalog/11111111/detail.aspx',
+        'thumbnail': 'https://cdn.wildberries.ru/photos/11111111.jpg',
+        'marketplace': 'Wildberries',
+        'similarity': 0.45,  # Не очень похоже
+    },
+]
+```
+
+---
+
+**Ключевые концепции:**
+
+| Термин | Пояснение |
+|--------|-----------|
+| **pHash** | Перцептивный хэш — "отпечаток" изображения на основе визуального восприятия |
+| **Hamming distance** | Количество отличающихся бит между хэшами. pHash размером 64 бита, distance 0-64 |
+| **similarity score** | Сходство от 0 до 1. Формула: `1 - (distance / max_bits)` |
+| **og:image** | OpenGraph мета-тег для соцсетей. Часто содержит главное фото товара |
+| **thumbnail** | Уменьшенная копия изображения для быстрой загрузки |
+
+**Сравнение типов хэширования:**
+
+| Тип | Описание | Использование |
+|-----|----------|--------------|
+| **MD5/SHA** | Криптографические хэши | Проверка целостности файла |
+| **pHash** | Перцептивный хэш | Визуальное сравнение изображений |
+| **dHash** | Difference хэш | Быстрое сравнение, устойчив кresize |
+| **aHash** | Average хэш | Простейший, быстрый |
 
 ---
 
@@ -1953,35 +2990,288 @@ async def marketplace_search(imageUrl: str = None, query: str = None):
 
 **Описание**: Добавление поддержки прокси для обхода блокировок.
 
-**Новые зависимости**:
-```python
-# requirements.txt
-curl_cffi>=0.5.0  # Имитация браузера
-playwright>=1.40.0  # Для сложных страниц
-playwright-stealth>=1.1.0  # Антидетекция
+---
+
+**Зачем нужен прокси?**
+
+Маркетплейсы (Wildberries, Ozon) активно борются с автоматизированным парсингом:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ПРОБЛЕМА: Блокировка парсинга                                        │
+│                                                                         │
+│  ┌──────────────┐         Запросы         ┌───────────────────────┐    │
+│  │              │ ───────────────────►   │                       │    │
+│  │  Наш сервер  │    100+ запросов       │   Wildberries         │    │
+│  │              │ ◄───────────────────   │                       │    │
+│  └──────────────┘         │               └───────────────────────┘    │
+│                           │                                              │
+│                           ▼                                              │
+│                   403 Forbidden                                         │
+│                   "Доступ запрещён"                                     │
+│                   или CAPTCHA                                           │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Код прокси**:
-```python
-WB_PROXY_URL = os.environ.get('WB_PROXY') or os.environ.get('MARKETPLACE_PROXY')
+**Как прокси помогает:**
 
-def get_proxy_config() -> dict:
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  РЕШЕНИЕ: Использование прокси                                          │
+│                                                                         │
+│  ┌──────────────┐         Запрос          ┌────────────┐             │
+│  │              │ ──────────────────────►  │            │             │
+│  │  Наш сервер  │                         │  Прокси    │             │
+│  │              │ ◄──────────────────────  │  сервер    │             │
+│  └──────────────┘                         └─────┬──────┘             │
+│                                                 │                    │
+│                           Запрос с нового IP     │                    │
+│                                                 ▼                    │
+│                                          ┌───────────────────────┐   │
+│                                          │     Wildberries       │   │
+│                                          │   Видит "нового"      │   │
+│                                          │   пользователя        │   │
+│                                          └───────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+**Новые зависимости:**
+
+```python
+# requirements.txt — файл с зависимостями Python
+# ============================================================================
+# КАЖДЫЙ пакет — это готовая библиотека с открытым кодом
+# ============================================================================
+
+curl_cffi>=0.5.0  
+# ──────────────────────────────────────────────────────────────────────────
+# ЧТО ЭТО: Библиотека для HTTP запросов с имитацией браузера
+# ЗАЧЕМ: Обычный requests легко детектируется как бот
+#       curl_cffi имитирует реальный браузер Chrome
+# КАК РАБОТАЕТ:
+#   - requests: "Python/3.9" в заголовке User-Agent
+#   - curl_cffi: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit..."
+# ============================================================================
+
+playwright>=1.40.0
+# ──────────────────────────────────────────────────────────────────────────
+# ЧТО ЭТО: Инструмент для автоматизации браузера
+# ЗАЧЕМ: Для сайтов с JavaScript которые не работают через simple requests
+# ИСПОЛЬЗОВАНИЕ: Можно "прокрутить" страницу, кликнуть, заполнить форму
+# ============================================================================
+
+playwright-stealth>=1.1.0
+# ──────────────────────────────────────────────────────────────────────────
+# ЧТО ЭТО: "Антидетекция" для Playwright
+# ЗАЧЕМ: Сайты могут определять автоматизацию по:
+#         - navigator.webdriver = True
+#         - отсутствию движения мыши
+#         - другим признакам
+#       playwright-stealth скрывает эти признаки
+# ============================================================================
+```
+
+---
+
+**Код прокси:**
+
+```python
+# backend/marketplace_real.py
+# ============================================================================
+# ИМПОРТЫ БИБЛИОТЕК ДЛЯ РАБОТЫ С ПРОКСИ
+# ============================================================================
+
+# Попытка импортировать curl_cffi
+# try/except — защита от ошибки если библиотека не установлена
+try:
+    from curl_cffi import requests as curl_requests
+except Exception:
+    curl_requests = None  # Если не установлена — используем обычный requests
+
+# Аналогично для Playwright
+try:
+    from playwright.sync_api import sync_playwright
+except Exception:
+    sync_playwright = None
+
+try:
+    from playwright_stealth import Stealth
+except Exception:
+    Stealth = None
+
+# ============================================================================
+# КОНФИГУРАЦИЯ ПРОКСИ
+# ============================================================================
+
+# WB_PROXY_URL — URL прокси-сервера для Wildberries
+# os.environ.get() — читает переменную окружения
+# Если переменная не найдена — используется следующая (MARKETPLACE_PROXY)
+# Если и её нет — используется HTTPS_PROXY или HTTP_PROXY
+
+WB_PROXY_URL = (
+    os.environ.get('WB_PROXY')           # Приоритет 1: явная переменная WB
+    or os.environ.get('MARKETPLACE_PROXY')  # Приоритет 2: общая для маркетплейсов
+    or os.environ.get('HTTPS_PROXY')       # Приоритет 3: стандартная переменная
+    or os.environ.get('HTTP_PROXY')        # Приоритет 4: fallback
+)
+
+# ============================================================================
+# ФУНКЦИЯ: Получение конфигурации прокси
+# ============================================================================
+
+def get_proxy_config() -> dict[str, str] | None:
+    """
+    Возвращает конфигурацию прокси для HTTP запросов
+    
+    Возвращает:
+        None — если прокси не настроен (запросы идут напрямую)
+        {'http': 'http://proxy:port', 'https': 'http://proxy:port'} — настройка
+    
+    Пример URL прокси:
+        http://username:password@proxy.example.com:8080
+        socks5://proxy.example.com:1080
+    """
     if not WB_PROXY_URL:
-        return None
+        return None  # Прокси не настроен
+    
+    # Возвращаем словарь с HTTP и HTTPS прокси
+    # Обычно они одинаковые
     return {'http': WB_PROXY_URL, 'https': WB_PROXY_URL}
 
+
+# ============================================================================
+# ФУНКЦИЯ: Создание HTTP сессии с прокси
+# ============================================================================
+
 def create_http_session():
-    if curl_requests is not None:
-        session = curl_requests.Session(impersonate='chrome120')
-        proxy_config = get_proxy_config()
-        if proxy_config:
-            session.proxies = proxy_config
-        return session
+    """
+    Создаёт HTTP сессию с настроенным прокси и имитацией браузера
     
+    Приоритет библиотек:
+        1. curl_cffi — если установлена (лучшая имитация Chrome)
+        2. requests — fallback (легче детектируется)
+    
+    Возвращает:
+        Объект сессии с методами .get(), .post() и настроенным прокси
+    """
+    
+    # ─── ВАРИАНТ 1: curl_cffi (приоритет) ───
+    if curl_requests is not None:
+        try:
+            # Создаём сессию с имитацией Chrome 120
+            # impersonate — какую версию Chrome имитировать
+            session = curl_requests.Session(impersonate='chrome120')
+            
+            # Настраиваем прокси
+            proxy_config = get_proxy_config()
+            if proxy_config:
+                try:
+                    session.proxies = proxy_config
+                except Exception:
+                    pass  # Игнорируем ошибку настройки прокси
+            
+            return session  # Возвращаем настроенную сессию
+            
+        except Exception:
+            pass  # Если не получилось — пробуем другой вариант
+    
+    # ─── ВАРИАНТ 2: requests (fallback) ───
+    # Создаём обычную сессию requests
     session = requests.Session()
-    session.proxies.update(get_proxy_config() or {})
+    
+    # Настраиваем прокси
+    proxy_config = get_proxy_config()
+    if proxy_config:
+        # .update() — добавляем прокси к существующим настройкам
+        session.proxies.update(proxy_config)
+    
     return session
+
+
+# ============================================================================
+# ФУНКЦИЯ: "Прогрев" сессии Wildberries
+# ============================================================================
+
+def warm_wildberries_session(session, headers: dict[str, str]) -> None:
+    """
+    "Прогревает" сессию — делает начальный запрос к главной странице
+    
+    ЗАЧЕМ: Wildberries может блокировать первый запрос с поисковым параметром
+           Но пропускает запрос к главной странице
+    """
+    try:
+        # GET запрос к главной странице WB
+        session.get('https://www.wildberries.ru/', headers=headers, timeout=10)
+    except Exception:
+        # Игнорируем ошибки — прогрев не критичен
+        pass
 ```
+
+---
+
+**Как это работает вместе:**
+
+```python
+# Пример использования
+
+# 1. Создаём сессию (с прокси если настроен)
+session = create_http_session()
+
+# 2. Заголовки для имитации браузера
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+}
+
+# 3. "Прогреваем" сессию
+warm_wildberries_session(session, headers)
+
+# 4. Делаем запрос как настоящий браузер
+response = session.get(
+    'https://search.wb.ru/exactmatch/ru/common/v5/search',
+    params={'query': 'платье', 'sort': 'popular'},
+    headers=headers,
+    timeout=15,
+)
+
+# 5. Обрабатываем ответ
+if response.status_code == 200:
+    data = response.json()
+    print(f"Найдено {len(data['data']['products'])} товаров")
+```
+
+---
+
+**Типы прокси:**
+
+| Тип | Пример URL | Пояснение |
+|-----|------------|-----------|
+| **HTTP** | `http://proxy:8080` | Работает только для HTTP сайтов |
+| **HTTPS** | `https://proxy:8080` | Зашифрованное соединение |
+| **SOCKS4** | `socks4://proxy:1080` | Универсальный, быстрый |
+| **SOCKS5** | `socks5://proxy:1080` | Поддерживает UDP, аутентификация |
+| **Анонимный** | `http://user:pass@proxy:8080` | Скрывает ваш IP |
+| **Резидентский** | Special service | IP похожи на реальные устройства |
+
+**Где взять прокси:**
+- Платные сервисы: Bright Data, Oxylabs, SmartProxy
+- Бесплатные: (не рекомендуется для продакшена) publicproxy
+
+---
+
+**Ключевые концепции:**
+
+| Термин | Пояснение |
+|--------|-----------|
+| **Имитация браузера (impersonate)** | HTTP клиент представляется браузером чтобы обойти бот-детекцию |
+| **curl_cffi** | Библиотека с поддержкой TLS fingerprinting Chrome |
+| **Playwright** | Инструмент автоматизации реального браузера (Chrome, Firefox) |
+| **Stealth** | Техники сокрытия признаков автоматизации |
+| **Прогрев сессии** | Начальный запрос для установления "доверия" |
+| **Proxy chaining** | Несколько прокси последовательно (редко нужно) |
 
 ---
 
