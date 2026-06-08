@@ -3,14 +3,546 @@
 
 ## Содержание
 
-1. [Общая архитектура проекта](#1-общая-архитектура-проекта)
-2. [Хронология коммитов](#2-хронология-коммитов)
-3. [Ключевые функции и их реализация](#3-ключевые-функции-и-их-реализация)
-4. [Схема архитектуры](#4-схема-архитектуры)
+1. [Краткий курс Dart для знающих C/Python](#1-краткий-курс-dart-для-знающих-cpython)
+2. [Основы Flutter](#2-основы-flutter)
+3. [Общая архитектура проекта](#3-общая-архитектура-проекта)
+4. [Хронология коммитов](#4-хронология-коммитов)
+5. [Ключевые функции и их реализация](#5-ключевые-функции-и-их-реализация)
+6. [Схема архитектуры](#6-схема-архитектуры)
 
 ---
 
-## 1. Общая архитектура проекта
+## 1. Краткий курс Dart для знающих C/Python
+
+### 1.1 Основные отличия от C и Python
+
+| Концепция | C | Python | Dart |
+|-----------|---|--------|------|
+| Типизация | Статическая, ручная | Динамическая | Статическая, но с `var` и `dynamic` |
+| Объявление переменных | `int x = 5;` | `x = 5` | `int x = 5;` или `var x = 5;` |
+| Функции | `int add(int a, int b) { return a + b; }` | `def add(a, b): return a + b` | `int add(int a, int b) => a + b;` |
+| Классы | `struct Point { int x; int y; };` | `class Point: pass` | `class Point { int x; int y; }` |
+| Наследование | `#include`, struct inheritance | `class Child(Parent):` | `class Child extends Parent {}` |
+| Интерфейсы | separate concept | duck typing | explicit interfaces via `implements` |
+| Null safety | указатели, NULL | `None` | `?` nullable types (`String?`) |
+
+### 1.2 Базовый синтаксис
+
+#### Переменные
+
+```dart
+// Явная типизация (как в C)
+int age = 25;
+double price = 19.99;
+String name = "Alice";
+bool isActive = true;
+
+// Неявная типизация (компилятор сам определяет тип)
+var age2 = 25;           // int
+var name2 = "Bob";       // String
+var price2 = 19.99;      // double
+
+// Nullable типы (может быть null) — специфика Dart
+String? nullableName;    // может быть String или null
+int? maybeNumber;        // может быть int или null
+
+// Константы времени компиляции
+const int maxItems = 100;
+final DateTime now = DateTime.now();  // вычисляется один раз при запуске
+```
+
+**Пояснение:**
+- `var` — компилятор сам выводит тип из присваиваемого значения
+- `const` — значение должно быть известно на этапе компиляции
+- `final` — значение присваивается один раз, но может быть вычислено в runtime
+- `?` после типа — nullable (может быть null), как `Optional<T>` в Java/C++ или `Maybe` в Haskell
+
+#### Функции
+
+```dart
+// Обычная функция (синтаксис похож на C)
+int add(int a, int b) {
+  return a + b;
+}
+
+// Стрелочная функция (однострочная) — как lambda в Python
+int multiply(int a, int b) => a * b;
+
+// Функция с необязательными параметрами
+String greet(String name, [String? suffix]) {
+  if (suffix != null) {
+    return "Hello, $name $suffix";
+  }
+  return "Hello, $name";
+}
+
+// Именованные параметры с значениями по умолчанию
+String createUrl(String host, {int port = 80, bool ssl = false}) {
+  final protocol = ssl ? "https" : "http";
+  return "$protocol://$host:$port";
+}
+
+// Использование:
+greet("Alice");                      // позиционный
+greet("Bob", "Jr.");                  // позиционный + опциональный
+createUrl("example.com");             // именованные параметры
+createUrl("example.com", port: 443, ssl: true);  // явные имена
+
+// Callback/функция как параметр
+void fetchData(void Function(String) onComplete) {
+  // ... загрузка данных ...
+  onComplete("данные получены");
+}
+```
+
+**Пояснение:**
+- `[Type?]` в квадратных скобках — опциональный параметр (может быть опущен)
+- `{Type param = default}` в фигурных скобках — именованный параметр с дефолтом
+- `=>` (стрелка) — сокращённая запись для функций, возвращающих одно выражение
+- `$variable` или `${expression}` в строках — интерполяция строк (как f-strings в Python)
+
+#### Классы
+
+```dart
+// Определение класса
+class User {
+  // Поля ( fields) — как структуры в C
+  String name;
+  int age;
+  String? email;  // nullable — может быть null
+  
+  // Конструктор — специальный метод, вызывается при создании объекта
+  User(this.name, this.age, [this.email]);
+  
+  // Именованный конструктор — несколько способов создания
+  User.anonymous() : this("Anonymous", 0);
+  
+  // Конструктор с именованными параметрами
+  User.guest({String? name}) : this(name ?? "Guest", 18);
+  
+  // Метод — функция внутри класса
+  void sayHello() {
+    print("Привет, я $name!");
+  }
+  
+  // Геттер — вычисляемое свойство (как property в C#)
+  bool get isAdult => age >= 18;
+  
+  // Сеттер — можно добавить валидацию
+  set age(int newAge) {
+    if (newAge >= 0) {
+      age = newAge;
+    }
+  }
+}
+
+// Создание объекта
+final user = User("Alice", 30, "alice@example.com");
+user.sayHello();  // "Привет, я Alice!"
+
+// Конструктор по умолчанию без параметров
+class EmptyClass {
+  EmptyClass();
+}
+```
+
+**Пояснение:**
+- `this.name` в конструкторе — сокращение для присваивания поля
+- `: this(...)` в конструкторе — вызов другого конструктора (delegation)
+- `get` и `set` — геттеры и сеттеры, используются как свойства
+- `final` перед полем — поле нельзя изменить после создания объекта
+
+#### Коллекции
+
+```dart
+// Списки (массивы) — динамические, как list в Python
+List<int> numbers = [1, 2, 3, 4, 5];
+var names = ["Alice", "Bob", "Charlie"];
+
+// Доступ по индексу — как в C/Python
+print(numbers[0]);  // 1
+print(names[1]);    // "Bob"
+
+// Методы списков
+numbers.add(6);           // добавить в конец
+numbers.remove(3);         // удалить элемент
+numbers.contains(4);      // проверка наличия (True/False)
+numbers.length;           // длина списка
+numbers.map((n) => n * 2);  // трансформация (как list comprehension)
+numbers.where((n) => n > 2);  // фильтрация
+
+// Цикл for-each — как в Python
+for (var number in numbers) {
+  print(number);
+}
+
+// Множества (set) — уникальные элементы, без порядка
+Set<String> uniqueNames = {"Alice", "Bob", "Alice"};  // {"Alice", "Bob"}
+
+// Словари (map) — как dict в Python
+Map<String, int> ages = {
+  "Alice": 30,
+  "Bob": 25,
+};
+print(ages["Alice"]);  // 30
+ages["Charlie"] = 35;  // добавление
+```
+
+**Пояснение:**
+- `List<Type>` — generic (обобщённый) тип, как `std::vector<Type>` в C++
+- `Map<KeyType, ValueType>` — как словарь в Python, но с явной типизацией
+- `=>` в `map()` и `where()` — стрелочная функция для трансформации/фильтрации
+- `.` (точка) — доступ к методам и полям объекта
+
+#### Null safety (система безопасности от null)
+
+```dart
+// Non-nullable — НЕ может быть null (по умолчанию)
+String name = "Alice";  // OK
+// name = null;         // ОШИБКА компиляции!
+
+// Nullable — МОЖЕТ быть null
+String? nullableName;  // пока null
+nullableName = "Bob";  // OK
+nullableName = null;   // OK
+
+// Оператор ? (conditional access) — безопасный доступ
+// Если nullableName не null — вернёт его length, иначе null
+int? length = nullableName?.length;
+
+// Оператор ?? (null coalescing) — значение по умолчанию
+// Если nullableName не null — используем его, иначе "Unknown"
+String displayName = nullableName ?? "Unknown";
+
+// Оператор ! (bang) — утверждение что значение не null
+// Используйте ТОЛЬКО если уверены что значение не null!
+int definitelyLength = nullableName!.length;  // может вызвать ошибку если null!
+
+// Проверка на null через if — компилятор понимает
+if (nullableName != null) {
+  // Здесь компилятор знает что nullableName не null
+  print(nullableName.length);  // ! не нужен
+}
+```
+
+**Пояснение:**
+- Dart 2.12+ ввёл null safety по умолчанию — это защита от ошибок null pointer
+- `?` после типа — "этот тип может быть null"
+- `?.` — безопасный вызов метода (если объект null, вернёт null)
+- `??` — если первый операнд null, использовать второй
+- `!` — утверждение программиста "здесь точно не null"
+
+#### Async/await (асинхронное программирование)
+
+```dart
+// Future<T> — объект, который будет иметь значение типа T в будущем
+// Похоже на Promise в JavaScript, asyncio в Python
+
+Future<String> fetchUserData() async {
+  // await приостанавливает выполнение до получения результата
+  // другие операции в это время могут выполняться
+  final response = await http.get('https://api.example.com/user');
+  return response.body;
+}
+
+// async функция всегда возвращает Future
+Future<int> calculateSum(int a, int b) async {
+  await Future.delayed(Duration(seconds: 1));  // имитация задержки
+  return a + b;
+}
+
+// Обработка результата
+void main() async {
+  print("Начало");
+  
+  // Вариант 1: await (как синхронный код)
+  String data = await fetchUserData();
+  print("Получено: $data");
+  
+  // Вариант 2: then (цепочка callbacks)
+  fetchUserData().then((data) {
+    print("Получено через then: $data");
+  });
+  
+  // Вариант 3: try-catch для ошибок
+  try {
+    String data = await fetchUserData();
+    print("Успех: $data");
+  } catch (error) {
+    print("Ошибка: $error");
+  }
+  
+  print("Конец");
+}
+```
+
+**Пояснение:**
+- `async` — функция асинхронная (выполняется параллельно с другим кодом)
+- `await` — ждёт результат Future, не блокируя другие операции
+- `Future<T>` — обещание вернуть значение типа T когда-нибудь
+- `catchError` или `try-catch` — обработка ошибок в async коде
+
+#### Расширения и миксины
+
+```dart
+// Extension — добавление методов к существующему классу
+extension StringExtensions on String {
+  bool get isEmail => this.contains('@') && this.contains('.');
+  
+  String capitalize() {
+    if (isEmpty) return this;
+    return '${this[0].toUpperCase()}${substring(1)}';
+  }
+}
+
+// Использование
+"alice@example.com".isEmail;    // true
+"hello".capitalize();          // "Hello"
+
+// Mixin — повторно используемый код, который можно "вмешать" в класс
+mixin Logger {
+  void log(String message) {
+    print('[LOG] $message');
+  }
+}
+
+// with — включение миксина в класс
+class User with Logger {
+  String name;
+  User(this.name);
+  
+  void doSomething() {
+    log("Пользователь $name что-то сделал");
+  }
+}
+```
+
+---
+
+## 2. Основы Flutter
+
+### 2.1 Что такое Flutter и Widget
+
+**Flutter** — это SDK от Google для создания кроссплатформенных приложений (iOS, Android, Web, Desktop).
+
+**Widget** — это базовый строительный блок UI в Flutter. Всё на экране — виджет:
+- Текст (`Text`)
+- Кнопка (`ElevatedButton`)
+- Изображение (`Image`)
+- Список (`ListView`)
+- Экран приложения (`Scaffold`)
+
+### 2.2 StatelessWidget — виджет без состояния
+
+```dart
+// StatelessWidget — виджет который НЕ меняется после создания
+class MyText extends StatelessWidget {
+  final String message;  // final — нельзя изменить после создания
+  
+  // Конструктор с именованным параметром
+  const MyText({super.key, required this.message});
+  
+  // build — главный метод, возвращает UI виджета
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      message,
+      style: TextStyle(fontSize: 24, color: Colors.blue),
+    );
+  }
+}
+
+// Использование
+MyText(message: "Привет!")
+```
+
+**Пояснение:**
+- `super.key` — передаёт key родительскому виджету (для идентификации)
+- `required` — обязательный именованный параметр
+- `@override` — аннотация что метод переопределяет родительский
+- `build(BuildContext context)` — вызывается Flutter для отрисовки виджета
+- `context` — содержит информацию о теме, навигации, размере экрана
+
+### 2.3 StatefulWidget — виджет с состоянием
+
+```dart
+// StatefulWidget — виджет который МОЖЕТ менять состояние
+class Counter extends StatefulWidget {
+  const Counter({super.key});  // super.key — стандартный параметр Flutter
+  
+  @override
+  // createState — создаёт объект состояния
+  State<Counter> createState() => _CounterState();
+}
+
+// State — класс содержащий данные виджета
+class _CounterState extends State<Counter> {
+  int _count = 0;  // _ в начале — private ( приватное поле)
+  
+  // setState — сообщает Flutter что данные изменились, нужно перерисовать
+  void _increment() {
+    setState(() {
+      _count++;  // изменяем данные
+    });
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text('Счётчик: $_count'),
+        ElevatedButton(
+          onPressed: _increment,  // передаём функцию как callback
+          child: Text('+1'),
+        ),
+      ],
+    );
+  }
+}
+```
+
+**Пояснение:**
+- `_` перед именем — приватный модификатор (как `private` в C++)
+- `State` — generic тип: `State<Counter>` означает "состояние виджета Counter"
+- `setState()` — вызывается когда данные изменились, триггерит перерисовку
+- `children: [...]` — список дочерних виджетов (как children в React)
+
+### 2.4 Основные виджеты
+
+```dart
+// Scaffold — базовый каркас экрана (AppBar + Body + FAB и т.д.)
+Scaffold(
+  appBar: AppBar(
+    title: Text("Мой экран"),
+    actions: [IconButton(icon: Icon(Icons.settings), onPressed: () {})],
+  ),
+  body: Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,  // центрирование по вертикали
+      children: [
+        Text("Привет!"),
+        ElevatedButton(
+          onPressed: () => print("Нажата!"),
+          child: Text("Нажми меня"),
+        ),
+      ],
+    ),
+  ),
+  floatingActionButton: FloatingActionButton(
+    onPressed: () {},
+    child: Icon(Icons.add),
+  ),
+);
+
+// Column — вертикальный контейнер (как VBox в Tkinter)
+// Row — горизонтальный контейнер (как HBox)
+
+// Padding — отступы
+Padding(
+  padding: EdgeInsets.all(16),  // 16 пикселей со всех сторон
+  child: Text("Текст с отступами"),
+);
+
+// Container — универсальный контейнер (как div в CSS)
+Container(
+  width: 200,
+  height: 100,
+  margin: EdgeInsets.symmetric(horizontal: 20),  // отступы
+  padding: EdgeInsets.all(10),
+  decoration: BoxDecoration(
+    color: Colors.blue,
+    borderRadius: BorderRadius.circular(8),  // скруглённые углы
+  ),
+  child: Text("Styled Container"),
+);
+```
+
+### 2.5 Навигация между экранами
+
+```dart
+// Переход на новый экран
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => DetailScreen(itemId: 123),
+  ),
+);
+
+// Возврат на предыдущий экран
+Navigator.pop(context);
+
+// Переход с заменой текущего экрана (без возврата)
+Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(builder: (context) => HomeScreen()),
+);
+
+// Получение данных при возврате
+final result = await Navigator.push<String>(
+  context,
+  MaterialPageRoute(builder: (context) => SelectScreen()),
+);
+// result содержит данные возвращённые из SelectScreen
+```
+
+### 2.6 Работа с Firestore
+
+```dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+// Получение документа
+Future<Map<String, dynamic>?> getUser(String email) async {
+  final doc = await FirebaseFirestore.instance
+      .collection('Users')           // коллекция (таблица)
+      .doc(email)                    // документ по ID
+      .get();
+  
+  return doc.data();  // вернёт Map или null если документа нет
+}
+
+// Сохранение/обновление документа
+Future<void> saveUser(String email, Map<String, dynamic> data) async {
+  await FirebaseFirestore.instance
+      .collection('Users')
+      .doc(email)
+      .set(data, SetOptions(merge: true));  // merge — не перезаписывать существующие поля
+}
+
+// Добавление в массив
+Future<void> addToFavorites(String email, String imageUrl) async {
+  await FirebaseFirestore.instance
+      .collection('Users')
+      .doc(email)
+      .update({
+    'favorites': FieldValue.arrayUnion([imageUrl]),  // добавить элемент
+    // FieldValue.arrayRemove([imageUrl]) — удалить элемент
+  });
+}
+
+// Запрос к коллекции
+Future<List<Map<String, dynamic>>> getPosts() async {
+  final snapshot = await FirebaseFirestore.instance
+      .collection('Posts')
+      .where('author', isEqualTo: 'alice@example.com')  // фильтр
+      .orderBy('createdAt', descending: true)           // сортировка
+      .limit(20)                                        // лимит
+      .get();
+  
+  return snapshot.docs.map((doc) => doc.data()).toList();
+}
+```
+
+**Пояснение:**
+- `Collection` — коллекция документов (аналог таблицы в SQL)
+- `Document` — отдельная запись (аналог строки в SQL)
+- `.doc(id)` — получение/создание документа по ID
+- `FieldValue.arrayUnion()` — добавить элемент в массив если его там нет
+- `.where()` — фильтрация (аналог WHERE в SQL)
+- `.orderBy()` — сортировка (аналог ORDER BY)
+
+---
+
+## 3. Общая архитектура проекта
 
 Проект **Stylee** — это мобильное приложение для подбора одежды и стиля с ИИ-помощником.
 
@@ -51,7 +583,7 @@ stylee_upprpo_24943/
 
 ---
 
-## 2. Хронология коммитов
+## 4. Хронология коммитов
 
 ### Февраль 2026 — Инициализация проекта
 
@@ -274,37 +806,367 @@ class WardrobeService {
 **Описание**: Создание модели данных для хранения дизлайков пользователя.
 
 **Новые файлы**:
+
 ```dart
 // stylee_app/lib/models/dislike.dart
+// ============================================================================
+// ЧТО ТАКОЕ МОДЕЛЬ ДАННЫХ?
+// Модель (model) — это класс, описывающий структуру данных в приложении.
+// В данном случае мы создаём модель Dislike для хранения информации о дизлайках.
+// 
+// АНАЛОГИЯ:
+// В C: struct Dislike { char* id; char* description; ... }
+// В Python: dataclass с полями
+// В SQL: таблица с колонками
+// ============================================================================
+
+/// Модель для хранения информации о дизлайке
+/// 
+/// Ключевые концепции Dart здесь:
+/// - class — объявление класса (как struct в C, но с методами)
+/// - final — поле можно задать один раз при создании, нельзя изменить после
+/// - required — параметр обязателен при создании объекта
+/// - Map<String, dynamic> — словарь с ключами-строками и значениями любого типа
+/// - factory — фабричный конструктор (создаёт объект особым способом)
 class Dislike {
+  // ==========================================================================
+  // ПОЛЯ КЛАССА — переменные принадлежащие объекту (как поля структуры в C)
+  // ==========================================================================
+  
+  /// Уникальный идентификатор дизлайка
+  /// final = нельзя изменить после создания объекта
+  /// String = тип данных (строка)
   final String id;
-  final String description;  // что именно дизлайкнули
-  final String category;     // 'clothing', 'color', 'style'
+  
+  /// Описание: что именно дизлайкнули ("розовые брюки", "клетчатые рубашки")
+  final String description;
+  
+  /// Категория дизлайка: 
+  ///   'clothing' — тип одежды
+  ///   'color' — цвет
+  ///   'style' — стиль
+  ///   'pattern' — узор
+  ///   'brand' — бренд
+  final String category;
+  
+  /// Дата и время когда был добавлен дизлайк
+  /// DateTime — класс для работы с датой и временем (как datetime в Python)
   final DateTime createdAt;
 
-  Map<String, dynamic> toMap() => {...}
-  factory Dislike.fromMap(Map<String, dynamic> map) => {...}
+  // ==========================================================================
+  // КОНСТРУКТОР — метод для создания объекта Dislike
+  // ==========================================================================
+  // В Dart конструктор имеет то же имя что и класс
+  // this.<field> — сокращение для присваивания параметра полю
+  //
+  // Пример: Dislike(id: '...', description: '...', ...)
+  // Автоматически присвоит: this.id = '...', this.description = '...'
+  
+  Dislike({
+    required this.id,           // required = обязательный параметр
+    required this.description,  // Ошибка компиляции если не передать
+    required this.category,     // Все 4 поля обязательны
+    required this.createdAt,
+  });
+  
+  // ==========================================================================
+  // МЕТОД toMap() — преобразование объекта в словарь (для сохранения в БД)
+  // ==========================================================================
+  // Firestore хранит данные как Map (словарь/JSON объект)
+  // Этот метод конвертирует объект Dislike в формат для хранения
+  //
+  // АНАЛОГИЯ В PYTHON:
+  // def to_dict(self):
+  //     return {'id': self.id, 'description': self.description, ...}
+  
+  Map<String, dynamic> toMap() {
+    // Возвращаем словарь {ключ: значение}
+    return {
+      'id': id,                 // строка
+      'description': description,  // строка
+      'category': category,    // строка
+      'createdAt': createdAt,  // DateTime — Firebase сохранит как timestamp
+    };
+    // Результат: {'id': 'pink_trousers', 'description': 'розовые брюки', ...}
+  }
+  
+  // ==========================================================================
+  // ФАБРИЧНЫЙ КОНСТРУКТОР fromMap() — создание объекта из словаря
+  // ==========================================================================
+  // factory = особый тип конструктора
+  // Может вернуть существующий объект или создать новый особым способом
+  // Этот метод создаёт Dislike из данных полученных из Firestore
+  //
+  // АНАЛОГИЯ В PYTHON:
+  // @classmethod
+  // def from_dict(cls, data):
+  //     return cls(id=data['id'], description=data['description'], ...)
+  
+  factory Dislike.fromMap(Map<String, dynamic> map) {
+    // map — словарь полученный из Firestore
+    // map['field'] — доступ к значению по ключу (как dict['field'] в Python)
+    
+    return Dislike(
+      // ?? — оператор "если левое значение null, использовать правое"
+      // АНАЛОГ В PYTHON: data.get('id') or ''
+      id: map['id'] ?? '',  // Если id нет в данных — пустая строка
+      
+      description: map['description'] ?? '',  // Если нет — пустая строка
+      
+      category: map['category'] ?? 'general',  // Если нет — 'general'
+      
+      // Firebase хранит даты как Timestamp, нужно конвертировать в DateTime
+      // (map['createdAt'] as dynamic) — приводим к dynamic чтобы вызвать toDate()
+      // ?.toDate() — безопасный вызов (если null, вернёт null, не ошибку)
+      // ?? DateTime.now() — если toDate() вернул null, берём текущее время
+      createdAt: (map['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
+    );
+  }
+  
+  // ==========================================================================
+  // ПЕРЕОПРЕДЕЛЕНИЕ toString() — для удобного вывода при отладке
+  // ==========================================================================
+  // @override = аннотация что мы переопределяем метод родительского класса (Object)
+  // => — стрелочная функция (однострочный return)
+  
+  @override
+  String toString() => 'Dislike(id: $id, description: $description, category: $category)';
+  // $variable = интерполяция строк (вставляет значение переменной)
+  // АНАЛОГ В PYTHON: f"Dislike(id={id}, description={description}, ...)"
 }
 ```
 
-**Сервис**:
+**Подробный разбор синтаксиса Dart:**
+
+| Синтаксис Dart | Аналог в C | Аналог в Python | Пояснение |
+|----------------|-----------|-----------------|-----------|
+| `class Dislike { }` | `struct Dislike { };` | `class Dislike:` | Объявление класса |
+| `final String id;` | `const char* id;` | `self.id = ...` (в `__init__`) | Неизменяемое поле |
+| `required this.id` | параметр struct | параметр `__init__` | Обязательный параметр |
+| `Map<String, dynamic>` | `json_object*` | `dict` | Словарь с типизацией |
+| `?? 'default'` | тернарный `?:` | `or 'default'` | Null coalescing |
+| `?.toDate()` | `->toDate()` | `.to_date()` с проверкой | Безопасный вызов |
+| `factory Dislike.fromMap(...)` | статическая функция | `@classmethod from_dict(...)` | Фабричный конструктор |
+| `$variable` | `printf("%s", var)` | `f"{variable}"` | Интерполяция строк |
+| `@override` | virtual override | `@override` | Аннотация переопределения |
+| `=> expression` | inline return | lambda | Стрелочная функция |
+
+---
+
+**Как это работает в приложении:**
+
+```dart
+// === СОЗДАНИЕ ДИЗЛАЙКА ===
+// Создаём новый объект Dislike с данными
+final dislike = Dislike(
+  id: 'pink_trousers',           // уникальный ID
+  description: 'розовые брюки',  // что не понравилось
+  category: 'clothing',          // категория
+  createdAt: DateTime.now(),     // текущее время
+);
+
+// === СОХРАНЕНИЕ В FIREBASE ===
+// Firebase не понимает объекты Dart, только словари (Map)
+// Поэтому конвертируем: Dislike -> Map
+final dislikeMap = dislike.toMap();
+// Результат: {'id': 'pink_trousers', 'description': 'розовые брюки', 
+//             'category': 'clothing', 'createdAt': Timestamp(...)}
+
+// Сохраняем в коллекцию Users, в документ пользователя
+// arrayUnion — добавляет элемент в массив (если его там нет)
+await FirebaseFirestore.instance
+    .collection('Users')
+    .doc('user@example.com')
+    .update({
+  'dislikes': FieldValue.arrayUnion([dislikeMap]),
+});
+
+// === ЗАГРУЗКА ИЗ FIREBASE ===
+// Получаем документ пользователя
+final doc = await FirebaseFirestore.instance
+    .collection('Users')
+    .doc('user@example.com')
+    .get();
+
+// Берём поле 'dislikes' — это массив словарей
+final dislikesData = doc.data()?['dislikes'] as List? ?? [];
+
+// Конвертируем каждый словарь обратно в объект Dislike
+// Map -> Dislike с помощью фабричного конструктора
+final dislikes = dislikesData
+    .map((data) => Dislike.fromMap(data as Map<String, dynamic>))
+    .toList();
+
+// Теперь у нас есть список объектов Dislike для работы
+for (final d in dislikes) {
+  print('${d.description} (${d.category})');  
+  // Вывод: "розовые брюки (clothing)"
+}
+```
+
+---
+
+**Сервис для работы с дизлайками:**
+
 ```dart
 // stylee_app/lib/services/dislike_service.dart
+// ============================================================================
+// СЕРВИС — класс содержащий бизнес-логику для работы с дизлайками
+// ============================================================================
+// Сервисы в Flutter используются для отделения логики от UI
+// Это следует паттерну "Service Layer" (сервисный слой)
+// ============================================================================
+
 class DislikeService {
-  // Сохранение дизлайков в Firestore
+  // --------------------------------------------------------------------------
+  // ПОЛЕ КЛАССА — экземпляр Firestore для работы с базой данных
+  // --------------------------------------------------------------------------
+  // FirebaseFirestore — класс для взаимодействия с Firebase Firestore
+  // .instance — статический метод, возвращает единственный экземпляр
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // _firestore — приватное поле ( underscore в начале = private)
+
+  // --------------------------------------------------------------------------
+  // МЕТОД saveDisilike() — сохранение нового дизлайка
+  // --------------------------------------------------------------------------
+  // async = асинхронная функция (не блокирует UI пока выполняется)
+  // void = функция ничего не возвращает
+  // required — обязательные параметры
+  // Future<void> — "когда-нибудь завершится, ничего не возвращая"
+  
   Future<void> saveDisilike({
-    required String userEmail,
-    required String description,
-    required String category,
-  }) async {...}
+    required String userEmail,     // email пользователя (ID документа)
+    required String description,   // описание дизлайка
+    required String category,      // категория
+  }) async {
+    // Создаём объект Dislike с переданными параметрами
+    final dislike = Dislike(
+      id: description.toLowerCase().replaceAll(' ', '_'),
+      // 'Розовые Брюки' -> 'розовые_брюки'
+      // Простой способ генерации ID на основе описания
+      
+      description: description,  // сохраняем оригинальное описание
+      category: category,
+      createdAt: DateTime.now(),  // текущее время
+    );
 
-  // Загрузка дизлайков
-  Future<List<Dislike>> getDislikes(String userEmail) async {...}
+    try {
+      // Обращаемся к коллекции 'Users', к документу с email
+      // .update() — обновляет документ (не перезаписывает весь!)
+      // Если документа нет — создаст новый
+      
+      await _firestore
+          .collection('Users')           // коллекция (аналог таблицы)
+          .doc(userEmail)                // документ по email (аналог строки)
+          .update({
+        // Поле 'dislikes' — массив дизлайков
+        // FieldValue.arrayUnion — добавить элемент в массив
+        // Элемент добавится только если его там нет (дубликаты не создаются)
+        'dislikes': FieldValue.arrayUnion([dislike.toMap()]),
+      });
+      // dislike.toMap() — конвертируем объект в словарь для Firebase
+      
+      print('Дизлайк сохранён: $description');
+      // $description — интерполяция строки (вставляет значение)
+      
+    } catch (e) {
+      // catch — перехват исключений (как в Python)
+      print('Ошибка сохранения дизлайка: $e');
+      rethrow;  // пробросить ошибку дальше (вызвавший код получит её)
+    }
+  }
 
-  // Построение фильтра для ИИ-промпта
-  String buildExcludeSection(List<Dislike> dislikes) {...}
+  // --------------------------------------------------------------------------
+  // МЕТОД getDislikes() — получение всех дизлайков пользователя
+  // --------------------------------------------------------------------------
+  // Future<List<Dislike>> — асинхронно вернёт список объектов Dislike
+  
+  Future<List<Dislike>> getDislikes(String userEmail) async {
+    try {
+      // Получаем документ пользователя
+      final doc = await _firestore
+          .collection('Users')
+          .doc(userEmail)
+          .get();
+      // .get() — асинхронное получение документа из Firebase
+
+      // doc.exists — проверяет существует ли документ
+      if (!doc.exists) {
+        return [];  // если нет — возвращаем пустой список
+      }
+
+      // doc.data() — получение данных документа как словаря
+      final data = doc.data();
+      
+      // data?['dislikes'] — безопасный доступ (если data null, вернёт null)
+      // ?? [] — если null, используем пустой список
+      // as List — приведение типа к List
+      // <dynamic> — generic параметр (список может содержать любые типы)
+      final dislikesList = data?['dislikes'] as List<dynamic>? ?? [];
+
+      // .map() — трансформация списка (аналог list comprehension)
+      // Для каждого элемента вызываем Dislike.fromMap()
+      // .toList() — конвертируем результат map в List
+      return dislikesList
+          .map((d) => Dislike.fromMap(d as Map<String, dynamic>))
+          .toList();
+          
+    } catch (e) {
+      print('Ошибка загрузки дизлайков: $e');
+      return [];  // при ошибке возвращаем пустой список
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // МЕТОД buildExcludeSection() — построение текста для ИИ-промпта
+  // --------------------------------------------------------------------------
+  // Этот метод создаёт текстовый блок, который добавляется в промпт ИИ
+  // чтобы ИИ знал что пользователю НЕ предлагать
+  
+  String buildExcludeSection(List<Dislike> dislikes) {
+    // Проверяем пустой ли список
+    if (dislikes.isEmpty) {  // .isEmpty — проверка на пустоту списка
+      return '';  // возвращаем пустую строку (не добавляем блок в промпт)
+    }
+    
+    // Если есть дизлайки — создаём текстовый блок
+    String section = '\n\nВАЖНО: Пользователь НЕ любит:\n';
+    
+    // Цикл for-each — аналог for item in list в Python
+    for (final d in dislikes) {
+      // section += — конкатенация строк (добавление к существующей)
+      section += '- ${d.description} (категория: ${d.category})\n';
+      // ${d.description} — интерполяция с доступом к полю объекта
+    }
+    
+    section += 'Не предлагайте товары или образы содержащие перечисленное.';
+    
+    return section;
+    // Результат:
+    // "
+    //
+    // ВАЖНО: Пользователь НЕ любит:
+    // - розовые брюки (категория: clothing)
+    // - клетка (категория: pattern)
+    // Не предлагайте товары или образы содержащие перечисленное."
+  }
 }
 ```
+
+---
+
+**Ключевые концепции сервиса:**
+
+| Концепция | Пояснение |
+|-----------|-----------|
+| `FirebaseFirestore.instance` | Единственный экземпляр Firestore (singleton pattern) |
+| `_firestore` | Приватное поле ( underscore = private в Dart) |
+| `async/await` | Асинхронное программирование (как asyncio в Python) |
+| `Future<T>` | Обещание вернуть T в будущем (как Promise в JS) |
+| `try/catch` | Обработка исключений (как в Python) |
+| `FieldValue.arrayUnion()` | Операция Firestore — добавить в массив |
+| `.map().toList()` | Трансформация списка (как list comprehension) |
+| `rethrow` | Пробросить перехваченную ошибку выше |
 
 ---
 
@@ -332,29 +1194,205 @@ Future<UserCredential> signUp(...) async {
 **Описание**: Интеграция дизлайков в системный промпт ИИ-стилиста.
 
 **Изменения** в `openrouter_service.dart`:
-```dart
-Future<String> getStyleAdvice(
-  String userMessage, {
-  List<Dislike> dislikes = const [],  // НОВЫЙ параметр
-}) async {
-  // Запрос к OpenRouter API с учетом дизлайков
-  final systemPrompt = _buildSystemPrompt(dislikes);
-  // ...
-}
 
-String _buildSystemPrompt(List<Dislike> dislikes) {
-  String prompt = _baseSystemPrompt;
+```dart
+// stylee_app/lib/services/openrouter_service.dart
+// ============================================================================
+// СЕРВИС OpenRouter — взаимодействие с ИИ-стилистом через OpenRouter API
+// ============================================================================
+// OpenRouter — это сервис-агрегатор различных ИИ-моделей
+// (Qwen, GPT, Claude и др.). Мы используем Qwen VL (Vision Language)
+// для анализа изображений и текстовых запросов
+// ============================================================================
+
+class OpenRouterService {
+  // --------------------------------------------------------------------------
+  // API ключ — загружается из .env файла
+  // --------------------------------------------------------------------------
+  // dotenv.env — словарь переменных окружения из .env файла
+  // dotenv.env['KEY'] ?? 'default' — получить значение или использовать дефолт
+  // final — константа (нельзя изменить после присвоения)
+  final String _apiKey = dotenv.env['OPENROUTER_API_KEY'] ?? '';
+
+  // --------------------------------------------------------------------------
+  // Поздняя инициализация сервиса дизлайков
+  // --------------------------------------------------------------------------
+  // late — "будет инициализировано позже, до первого использования"
+  // Это позволяет избежать циклических зависимостей при создании объектов
+  late DislikeService _dislikeService;
   
-  if (dislikes.isNotEmpty) {
-    prompt += '\n\nВАЖНО: Пользователь НЕ любит:\n';
-    for (final d in dislikes) {
-      prompt += '- ${d.description} (категория: ${d.category})\n';
-    }
-    prompt += 'НЕ предлагайте товары или образы, содержащие перечисленное.';
+  // Конструктор — инициализируем _dislikeService
+  OpenRouterService() {
+    _dislikeService = DislikeService();
   }
+
+  // ==========================================================================
+  // МЕТОД getStyleAdvice() — текстовый запрос к ИИ
+  // ==========================================================================
+  // Future<String> — асинхронная функция, вернёт строку когда-нибудь
+  // async — функция может приостанавливать выполнение (await)
   
-  return prompt;
+  Future<String> getStyleAdvice(
+    String userMessage, {
+    // Позиционные параметры идут без скобок
+    // {...} — именованные параметры (передаются по имени)
+    
+    // List<Dislike> — список объектов Dislike
+    // = const [] — значение по умолчанию (пустой список)
+    List<Dislike> dislikes = const [],
+    // const — создаёт неизменяемый объект (как кортеж в Python)
+  }) async {
+    // Проверка наличия API ключа
+    if (_apiKey.isEmpty) {
+      // return — возврат значения из функции
+      return '❌ Ошибка: API ключ не настроен.';
+    }
+
+    // --------------------------------------------------------------------------
+    // ПОСТРОЕНИЕ СИСТЕМНОГО ПРОМПТА С УЧЁТОМ ДИЗЛАЙКОВ
+    // --------------------------------------------------------------------------
+    // _buildSystemPrompt — приватный метод ( underscore = private)
+    final systemPrompt = _buildSystemPrompt(dislikes);
+
+    // --------------------------------------------------------------------------
+    // ФОРМИРОВАНИЕ ТЕЛА ЗАПРОСА К API
+    // --------------------------------------------------------------------------
+    // jsonEncode — сериализация объекта в JSON строку
+    // аналог json.dumps() в Python
+    final body = jsonEncode({
+      'model': 'qwen/qwen-vl-plus',  // Модель ИИ
+      'messages': [
+        // messages — история диалога
+        // role: 'system' — системные инструкции для ИИ
+        {
+          'role': 'system',
+          'content': systemPrompt,  // Промпт с дизлайками
+        },
+        // role: 'user' — сообщение пользователя
+        {'role': 'user', 'content': userMessage},
+      ],
+    });
+
+    // --------------------------------------------------------------------------
+    // ОТПРАВКА HTTP POST ЗАПРОСА
+    // --------------------------------------------------------------------------
+    
+    try {
+      // await — ждём завершения асинхронной операции
+      // http.post — POST запрос (как requests.post() в Python)
+      final response = await http.post(
+        Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
+        // Uri.parse — преобразование строки в объект Uri
+        // (аналог urllib.parse.urlparse() в Python)
+        
+        headers: {
+          // Authorization — заголовок авторизации
+          // Bearer — тип аутентификации (стандарт для API)
+          'Authorization': 'Bearer $_apiKey',
+          'Content-Type': 'application/json',  // Тип контента
+        },
+        body: body,  // Тело запроса (наш JSON)
+      );
+
+      // Проверка кода ответа HTTP
+      // 200 = успех, 401 = нет доступа, 500 = ошибка сервера и т.д.
+      if (response.statusCode == 200) {
+        // jsonDecode — парсинг JSON строки в Dart объект
+        // аналог json.loads() в Python
+        final data = jsonDecode(response.body);
+        
+        // Доступ к вложенным данным JSON
+        // data['choices'][0]['message']['content']
+        // Аналог в Python: data['choices'][0]['message']['content']
+        return data['choices'][0]['message']['content'];
+      } else {
+        return '❌ Ошибка API: код ${response.statusCode}';
+      }
+    } catch (e) {
+      // catch — перехват исключений (как в Python try/except)
+      return '❌ Ошибка: $e';
+    }
+  }
+
+  // ==========================================================================
+  // PRIVATE МЕТОД _buildSystemPrompt() — построение промпта
+  // ==========================================================================
+  // _ в начале имени = приватный метод (не виден снаружи класса)
+  
+  String _buildSystemPrompt(List<Dislike> dislikes) {
+    // Базовый промпт — инструкции для ИИ-стилиста
+    // '''текст''' — многострочная строка (аналог """текст""" в Python)
+    String prompt = '''Ты ИИ-стилист для приложения Stylee. 
+Отвечай ТОЛЬКО на русском языке.
+Ты помогаешь пользователям подбирать одежду и стиль.
+Будь дружелюбным и давай практичные советы.''';
+
+    // --------------------------------------------------------------------------
+    // ДОБАВЛЕНИЕ БЛОКА С ДИЗЛАЙКАМИ
+    // --------------------------------------------------------------------------
+    // if (условие) — условный оператор (как в C/Python)
+    // isNotEmpty — метод проверки на непустоту (противоположность isEmpty)
+    
+    if (dislikes.isNotEmpty) {
+      // prompt += — конкатенация строк (добавление к существующей)
+      prompt += '\n\n⚠️ ВАЖНО: Пользователь НЕ любит:\n';
+      
+      // Цикл for-each — аналог for item in list в Python
+      // final d — объявление переменной цикла
+      for (final d in dislikes) {
+        // d.description — доступ к полю объекта (точка как в C/Python)
+        prompt += '• ${d.description}';
+        prompt += ' (категория: ${d.category})\n';
+        // ${переменная} — интерполяция строк (вставка значения)
+        // Аналог f"{переменная}" в Python
+      }
+      
+      prompt += '\nУчитывай это при рекомендациях!';
+    }
+
+    return prompt;
+  }
 }
+```
+
+**Ключевые концепции Dart в этом коде:**
+
+| Синтаксис | Аналог в Python | Пояснение |
+|-----------|----------------|-----------|
+| `final String _apiKey` | `self._api_key` | Неизменяемое поле |
+| `late DislikeService` | (поздняя инициализация) | Специфика Dart |
+| `async/await` | `async/await` | Асинхронность |
+| `Future<String>` | `Coroutine[str]` | Тип возврата async функции |
+| `jsonEncode({})` | `json.dumps({})` | Сериализация JSON |
+| `jsonDecode(string)` | `json.loads(string)` | Парсинг JSON |
+| `Uri.parse(url)` | `urllib.parse` | Парсинг URL |
+| `'''многострочный'''` | `"""многострочный"""` | Строковый литерал |
+| `prompt += text` | `prompt += text` | Конкатенация |
+| `for (final d in list)` | `for d in list:` | Цикл for-each |
+| `${d.field}` | `f"{d.field}"` | Интерполяция строк |
+
+**Как работает интеграция дизлайков:**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  1. Пользователь нажимает "💔 Не нравится" на товаре         │
+│                          ↓                                    │
+│  2. Открывается диалог выбора категории                      │
+│                          ↓                                    │
+│  3. DislikeService.saveDislike()                              │
+│     └── Сохраняет в Firestore: Users/{email}/dislikes        │
+│                          ↓                                    │
+│  4. При следующем запросе к ИИ:                               │
+│     dislikes = await DislikeService.getDislikes(email)        │
+│                          ↓                                    │
+│  5. _buildSystemPrompt(dislikes) формирует блок:             │
+│     "⚠️ ВАЖНО: Пользователь НЕ любит:                        │
+│      • розовые брюки (категория: clothing)"                  │
+│                          ↓                                    │
+│  6. Этот блок добавляется в system prompt ИИ                 │
+│                          ↓                                    │
+│  7. ИИ учитывает дизлайки и НЕ предлагает такие товары       │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1003,7 +2041,7 @@ def get_cache_key(query: str, imageHash: str = None) -> str:
 
 ---
 
-## 3. Ключевые функции и их реализация
+## 5. Ключевые функции и их реализация
 
 ### 3.1 Система дизлайков
 
@@ -1086,7 +2124,7 @@ if (selectedEvent != null) {
 
 ---
 
-## 4. Схема архитектуры
+## 6. Схема архитектуры
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
